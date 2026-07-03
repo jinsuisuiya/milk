@@ -308,7 +308,6 @@
     <div class="input-area-wrapper">
         <div class="batch-preview" id="batch-preview"></div>
         <div id="reply-preview-container"></div>
-        <!-- 收纳模式下的扩展面板（仅在收纳模式启用时出现） -->
         <div id="collapsed-extras-panel" style="display:none;">
             <div class="collapsed-extras-inner" style="padding:12px; background:var(--secondary-bg); border-top:1px solid var(--border-color);">
                 <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
@@ -336,47 +335,38 @@
                 </div>
             </div>
         </div>
-
-        <!-- + 号快捷托盘：少用功能 -->
-        <div id="quick-tray" style="display:none;">
-            <div class="quick-tray-item">
-                <button class="continue-btn input-btn" id="continue-btn" title="让对方继续说"><i class="fas fa-ellipsis-h"></i></button>
-                <span class="quick-tray-label">继续说</span>
-            </div>
-            <div class="quick-tray-item">
-                <button class="input-btn" id="quick-tray-call-btn" title="视频通话" onclick="window.toggleQuickTray();if(window.callFeature&&typeof window.callFeature.startCall==='function')window.callFeature.startCall(false);"><i class="fas fa-video"></i></button>
-                <span class="quick-tray-label">视频通话</span>
-            </div>
-        </div>
-
         <div class="input-area">
-            <button id="collapse-expand-btn" title="展开更多" style="display:none;width:36px;height:36px;border:none;border-radius:50%;cursor:pointer;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);font-size:14px;transition:all 0.25s;flex-shrink:0;align-items:center;justify-content:center;" onclick="window.toggleCollapsedExtras && window.toggleCollapsedExtras()"><i class="fas fa-chevron-up"></i></button>
+    <button id="collapse-expand-btn" title="展开更多" style="display:none;width:36px;height:36px;border:none;border-radius:50%;cursor:pointer;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);font-size:14px;transition:all 0.25s;flex-shrink:0;align-items:center;justify-content:center;" onclick="window.toggleCollapsedExtras && window.toggleCollapsedExtras()"><i class="fas fa-chevron-up"></i></button>
+    <button class="attachment-btn input-btn collapse-hideable" id="attachment-btn" title="发送图片"><i class="fas fa-image"></i></button>
+    
+    <button class="combo-btn input-btn collapse-hideable" id="combo-btn" title="表情 & 拍一拍">
+        <i class="fas fa-laugh-beam"></i>
+    </button>
 
-            <button class="attachment-btn input-btn" id="attachment-btn" title="发送图片"><i class="fas fa-image"></i></button>
-            <button class="combo-btn input-btn" id="combo-btn" title="表情 & 拍一拍"><i class="fas fa-laugh-beam"></i></button>
-
-            <textarea class="message-input" id="message-input" placeholder="" rows="1"></textarea>
-
-            <div class="input-buttons">
-                <button class="batch-btn input-btn" id="batch-btn" title="批量发送模式"><i class="fas fa-layer-group"></i></button>
-                <button id="quick-tray-btn" class="input-btn" title="更多功能" onclick="window.toggleQuickTray()"><i class="fas fa-plus"></i></button>
-                <button class="send-btn input-btn" id="send-btn" title="发送消息"><i class="fas fa-paper-plane"></i></button>
-                <div class="sticker-picker-popover" id="user-sticker-picker">
-                    <div class="combo-tabs-header">
-                        <button class="combo-tab-btn active" data-tab="my-sticker"><i class="fas fa-user" style="font-size:10px;"></i> 我</button>
-                        <button class="combo-tab-btn" data-tab="partner-sticker"><i class="fas fa-heart" style="font-size:10px;"></i> 对方</button>
-                        <button class="combo-tab-btn" data-tab="poke">拍一拍</button>
-                        <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
-                            <button id="sticker-add-btn" onclick="document.getElementById('my-sticker-quick-upload').click()" title="添加我的表情" style="background:var(--accent-color);border:none;cursor:pointer;padding:4px 10px;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px;border-radius:8px;transition:all 0.2s;box-shadow:0 2px 8px rgba(var(--accent-color-rgb),0.35);" onmouseover="this.style.opacity='0.85';this.style.transform='scale(1.05)'" onmouseout="this.style.opacity='1';this.style.transform='scale(1)'"><i class="fas fa-plus"></i> 添加</button>
-                            <button onclick="window.openMyStickerSettings()" title="管理表情库" style="background:none;border:none;cursor:pointer;padding:4px 8px;color:var(--text-secondary);font-size:12px;display:flex;align-items:center;gap:3px;border-radius:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-color-rgb),0.12)';this.style.color='var(--accent-color)'" onmouseout="this.style.background='none';this.style.color='var(--text-secondary)'"><i class="fas fa-cog"></i></button>
-                        </div>
-                    </div>
-                    <div class="combo-content-area" id="combo-content-area"></div>
+    <textarea class="message-input" id="message-input" placeholder="" rows="1"></textarea>
+    
+    <div class="input-buttons">
+    <button class="continue-btn input-btn" id="continue-btn" title="让对方继续说"><i class="fas fa-ellipsis-h"></i></button>
+        <button class="batch-btn input-btn collapse-hideable" id="batch-btn" title="批量发送模式"><i class="fas fa-layer-group"></i></button>
+        <button class="send-btn input-btn" id="send-btn" title="发送消息"><i class="fas fa-paper-plane"></i></button>
+        
+        <div class="sticker-picker-popover" id="user-sticker-picker">
+            <div class="combo-tabs-header">
+                <button class="combo-tab-btn active" data-tab="my-sticker"><i class="fas fa-user" style="font-size:10px;"></i> 我</button>
+                <button class="combo-tab-btn" data-tab="partner-sticker"><i class="fas fa-heart" style="font-size:10px;"></i> 对方</button>
+                <button class="combo-tab-btn" data-tab="poke">拍一拍</button>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
+                    <button id="sticker-add-btn" onclick="document.getElementById('my-sticker-quick-upload').click()" title="添加我的表情" style="background:var(--accent-color);border:none;cursor:pointer;padding:4px 10px;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px;border-radius:8px;transition:all 0.2s;box-shadow:0 2px 8px rgba(var(--accent-color-rgb),0.35);" onmouseover="this.style.opacity='0.85';this.style.transform='scale(1.05)'" onmouseout="this.style.opacity='1';this.style.transform='scale(1)'"><i class="fas fa-plus"></i> 添加</button>
+                    <button onclick="window.openMyStickerSettings()" title="管理表情库" style="background:none;border:none;cursor:pointer;padding:4px 8px;color:var(--text-secondary);font-size:12px;display:flex;align-items:center;gap:3px;border-radius:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-color-rgb),0.12)';this.style.color='var(--accent-color)'" onmouseout="this.style.background='none';this.style.color='var(--text-secondary)'"><i class="fas fa-cog"></i></button>
                 </div>
             </div>
-            <input type="file" id="image-input" class="file-input" accept="image/*">
-            <input type="file" id="my-sticker-quick-upload" class="file-input" accept="image/*" multiple>
+            <div class="combo-content-area" id="combo-content-area">
+            </div>
         </div>
+    </div>
+    <input type="file" id="image-input" class="file-input" accept="image/*">
+    <input type="file" id="my-sticker-quick-upload" class="file-input" accept="image/*" multiple>
+</div>
     </div>
 
 
@@ -410,107 +400,6 @@
             <textarea class="modal-textarea" id="note-input" placeholder="为这条消息添加注释..."></textarea><div class="modal-buttons">
                 <button class="modal-btn modal-btn-secondary" id="cancel-note">取消</button><button class="modal-btn modal-btn-primary" id="save-note">保存</button>
             </div>
-        </div>
-    </div>
-
-    <!-- 待办清单 modal -->
-    <div class="modal" id="todo-modal">
-        <div class="modal-content" style="max-width:420px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
-            <div class="modal-title">
-                <i class="fas fa-tasks"></i><span>待办清单</span>
-                <button onclick="document.getElementById('todo-modal').classList.remove('active')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:18px;padding:0 4px;"><i class="fas fa-times"></i></button>
-            </div>
-            <!-- 添加新任务 -->
-            <div style="display:flex;flex-direction:column;gap:8px;padding:0 0 14px;border-bottom:1px solid var(--border-color);margin-bottom:14px;">
-                <input type="text" id="todo-input-title" class="modal-input" placeholder="添加一项待办…" maxlength="60" style="margin:0;">
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <label style="font-size:12px;color:var(--text-secondary);white-space:nowrap;">截止时间</label>
-                    <input type="datetime-local" id="todo-input-deadline" style="flex:1;padding:7px 10px;border:1px solid var(--border-color);border-radius:10px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;font-family:var(--font-family);">
-                    <button id="todo-add-btn" onclick="window.todoAddTask()" style="padding:7px 16px;background:var(--accent-color);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">添加</button>
-                </div>
-            </div>
-            <!-- 任务列表 -->
-            <div id="todo-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;min-height:80px;">
-                <p style="text-align:center;color:var(--text-secondary);font-size:13px;margin-top:24px;" id="todo-empty-hint">还没有待办事项 ✓</p>
-            </div>
-            <div class="modal-buttons" style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border-color);">
-                <button class="modal-btn modal-btn-secondary" id="todo-clear-done-btn" onclick="window.todoClearDone()">清除已完成</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 待办提醒弹窗 -->
-    <div id="todo-reminder-popup" style="display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--secondary-bg);border:1px solid var(--accent-color);border-radius:16px;padding:14px 20px;box-shadow:0 8px 32px rgba(0,0,0,0.18);min-width:260px;max-width:90vw;">
-        <div style="display:flex;align-items:flex-start;gap:12px;">
-            <i class="fas fa-bell" style="color:var(--accent-color);font-size:18px;margin-top:2px;flex-shrink:0;"></i>
-            <div style="flex:1;">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px;">待办提醒</div>
-                <div id="todo-reminder-text" style="font-size:13px;color:var(--text-secondary);line-height:1.5;"></div>
-            </div>
-            <button onclick="document.getElementById('todo-reminder-popup').style.display='none'" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:16px;padding:0;flex-shrink:0;"><i class="fas fa-times"></i></button>
-        </div>
-    </div>
-
-    <!-- 日记 modal -->
-    <div class="modal" id="diary-modal">
-        <div class="modal-content" style="max-width:440px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;padding:0;">
-
-            <!-- 顶栏 -->
-            <div style="display:flex;align-items:center;gap:10px;padding:16px 18px 14px;border-bottom:1px solid var(--border-color);flex-shrink:0;">
-                <button id="diary-back-btn" onclick="window.diaryGoBack()" style="display:none;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:16px;padding:0 4px;"><i class="fas fa-arrow-left"></i></button>
-                <i class="fas fa-book-open" style="color:var(--accent-color);font-size:15px;"></i>
-                <span id="diary-modal-title" style="font-size:15px;font-weight:700;color:var(--text-primary);">我的日记</span>
-                <button onclick="document.getElementById('diary-modal').classList.remove('active')" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:18px;padding:0 4px;"><i class="fas fa-times"></i></button>
-            </div>
-
-            <!-- 视图1：日记列表 -->
-            <div id="diary-view-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
-                <div style="padding:14px 16px 6px;display:flex;justify-content:flex-end;">
-                    <button onclick="window.diaryOpenWrite()" style="padding:7px 16px;background:var(--accent-color);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;"><i class="fas fa-pen"></i> 写日记</button>
-                </div>
-                <div id="diary-list-container" style="flex:1;padding:6px 16px 16px;display:flex;flex-direction:column;gap:10px;">
-                    <p id="diary-empty-hint" style="text-align:center;color:var(--text-secondary);font-size:13px;margin-top:32px;">还没有日记，去写第一篇吧 ✍</p>
-                </div>
-            </div>
-
-            <!-- 视图2：写日记 -->
-            <div id="diary-view-write" style="display:none;flex:1;overflow-y:auto;flex-direction:column;padding:16px;">
-                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" id="diary-write-date"></div>
-                <textarea id="diary-write-content" placeholder="今天发生了什么……" style="flex:1;min-height:200px;width:100%;padding:12px;border:1px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:14px;line-height:1.7;font-family:var(--font-family);resize:none;outline:none;box-sizing:border-box;"></textarea>
-                <div style="display:flex;gap:8px;margin-top:12px;">
-                    <button onclick="window.diaryGoBack()" class="modal-btn modal-btn-secondary" style="flex:1;">取消</button>
-                    <button onclick="window.diarySave()" class="modal-btn modal-btn-primary" style="flex:2;">保存日记</button>
-                </div>
-            </div>
-
-            <!-- 视图3：阅读 + 字卡回复 -->
-            <div id="diary-view-read" style="display:none;flex:1;overflow-y:auto;flex-direction:column;">
-                <!-- 日记正文 -->
-                <div style="padding:16px 18px 14px;border-bottom:1px solid var(--border-color);">
-                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;" id="diary-read-date"></div>
-                    <div id="diary-read-content" style="font-size:14px;color:var(--text-primary);line-height:1.8;white-space:pre-wrap;"></div>
-                </div>
-                <!-- 已有回复 -->
-                <div id="diary-reply-section" style="padding:14px 18px;border-bottom:1px solid var(--border-color);display:none;">
-                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:5px;"><i class="fas fa-reply"></i> Ta 的回复</div>
-                    <div id="diary-existing-reply" style="font-size:13.5px;color:var(--text-primary);line-height:1.7;background:var(--secondary-bg);padding:10px 13px;border-radius:12px;border:1px solid var(--border-color);"></div>
-                </div>
-                <!-- 字卡区 -->
-                <div id="diary-card-section" style="padding:14px 18px;flex:1;">
-                    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;display:flex;align-items:center;gap:5px;"><i class="fas fa-hand-pointer"></i> 选词组成回复</div>
-                    <!-- 已选词展示 -->
-                    <div id="diary-reply-draft" style="min-height:48px;padding:10px 12px;background:var(--secondary-bg);border:1px dashed var(--border-color);border-radius:12px;font-size:13.5px;color:var(--text-primary);line-height:1.7;margin-bottom:12px;cursor:pointer;" onclick="window.diaryUndoLastCard()">
-                        <span id="diary-draft-text" style="color:var(--text-secondary);">点击字卡选词，点此处撤销最后一个</span>
-                    </div>
-                    <!-- 字卡堆 -->
-                    <div id="diary-card-deck" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;"></div>
-                    <div style="display:flex;gap:8px;">
-                        <button onclick="window.diaryShuffleCards()" class="modal-btn modal-btn-secondary" style="flex:1;"><i class="fas fa-random"></i> 换一批</button>
-                        <button onclick="window.diarySendReply()" class="modal-btn modal-btn-primary" style="flex:2;"><i class="fas fa-paper-plane"></i> 发送回复</button>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -1079,34 +968,6 @@
 
     <div id="appearance-panel-css" class="appearance-sub-panel" style="display:none;">
         <div class="settings-section">
-            <div class="settings-section-title"><i class="fas fa-magic"></i>快速预设</div>
-            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5;">点击预设自动填入全局 CSS，点「应用 CSS」生效。</div>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-
-                <button class="css-preset-btn" onclick="window.applyCssPreset('minimal-dark')">
-                    <span class="css-preset-icon">🌑</span>
-                    <div><div class="css-preset-name">夜间极简</div><div class="css-preset-desc">纯黑底 · 线框气泡 · 参考截图风格</div></div>
-                </button>
-
-                <button class="css-preset-btn" onclick="window.applyCssPreset('warm-white')">
-                    <span class="css-preset-icon">🤍</span>
-                    <div><div class="css-preset-name">暖白日系</div><div class="css-preset-desc">白底 · 绿色发送泡 · 清晨风</div></div>
-                </button>
-
-                <button class="css-preset-btn" onclick="window.applyCssPreset('pink-dream')">
-                    <span class="css-preset-icon">🌸</span>
-                    <div><div class="css-preset-name">粉梦少女</div><div class="css-preset-desc">粉紫渐变底 · 圆润气泡</div></div>
-                </button>
-
-                <button class="css-preset-btn css-preset-clear" onclick="window.applyCssPreset('clear')">
-                    <span class="css-preset-icon">✕</span>
-                    <div><div class="css-preset-name">清空预设</div><div class="css-preset-desc">清除全局 CSS 并还原</div></div>
-                </button>
-
-            </div>
-        </div>
-
-        <div class="settings-section" style="margin-top:18px;">
             <div class="settings-section-title"><i class="fas fa-comment-alt"></i>气泡 CSS</div>
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;line-height:1.5;">针对聊天气泡的样式覆盖，选择器限定在消息范围内。</div>
             <textarea id="custom-bubble-css" class="modal-textarea" style="font-family: monospace; font-size: 12px; height: 130px; white-space: pre;" placeholder=".message-sent {
@@ -1524,12 +1385,6 @@
                 <div class="settings-item-list">
                     <div class="settings-item" id="custom-replies-function">
                         <i class="fas fa-comment-dots"></i><span>自定义回复</span>
-                    </div>
-                    <div class="settings-item" id="todo-function">
-                        <i class="fas fa-tasks"></i><span>待办清单</span>
-                    </div>
-                    <div class="settings-item" id="diary-function">
-                        <i class="fas fa-book-open"></i><span>我的日记</span>
                     </div>
                     <div class="settings-item" id="stats-function">
                         <i class="fas fa-chart-bar"></i><span>消息统计</span>
@@ -2407,7 +2262,6 @@
     <script src="js/features.js"></script> 
     <script src="js/data.js"></script>
     <script src="js/onboarding.js"></script> 
-    <script src="js/features/diary.js"></script>
     <script src="js/listeners.js"></script>
     <script src="js/app.js"></script>
     <script>
