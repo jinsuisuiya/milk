@@ -3217,6 +3217,27 @@ window.exitCollapseMode = function() {
     if (typeof showNotification === 'function') showNotification('已退出收纳模式', 'success', 2000);
 };
 
+// ── 快捷托盘 (Quick Tray) ──
+window.toggleQuickTray = function() {
+    const tray = document.getElementById('quick-tray');
+    const btn  = document.getElementById('quick-tray-btn');
+    if (!tray) return;
+    const willOpen = tray.style.display === 'none' || tray.style.display === '';
+    tray.style.display = willOpen ? 'flex' : 'none';
+    if (btn) btn.classList.toggle('open', willOpen);
+};
+
+// 点击输入框时收起托盘
+document.addEventListener('click', function(e) {
+    const tray = document.getElementById('quick-tray');
+    const btn  = document.getElementById('quick-tray-btn');
+    if (!tray || tray.style.display === 'none') return;
+    if (!tray.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+        tray.style.display = 'none';
+        if (btn) btn.classList.remove('open');
+    }
+}, true);
+
 (function initCollapseMode() {
     function tryApply() {
         if (typeof settings !== 'undefined') {
@@ -3230,4 +3251,191 @@ window.exitCollapseMode = function() {
     } else {
         setTimeout(tryApply, 400);
     }
+})();
+
+// ════════════════════════════════════════════
+// 待办清单功能 (Todo Feature)
+// ════════════════════════════════════════════
+
+(function initTodoFeature() {
+
+    // ── 打开/关闭 ──
+    const todoFunction = document.getElementById('todo-function');
+    if (todoFunction) {
+        todoFunction.addEventListener('click', () => {
+            const modal = document.getElementById('todo-modal');
+            if (modal) { renderTodoList(); if (typeof showModal === 'function') showModal(modal); }
+        });
+    }
+
+    // ── 回车快速添加 ──
+    const titleInput = document.getElementById('todo-input-title');
+    if (titleInput) {
+        titleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); window.todoAddTask(); }
+        });
+    }
+
+    // ── 数据存取 ──
+    function getTodos() {
+        if (typeof settings === 'undefined') return [];
+        if (!Array.isArray(settings.todos)) settings.todos = [];
+        return settings.todos;
+    }
+    function saveTodos() {
+        if (typeof throttledSaveData === 'function') throttledSaveData();
+    }
+
+    // ── 添加任务 ──
+    window.todoAddTask = function() {
+        const titleEl    = document.getElementById('todo-input-title');
+        const deadlineEl = document.getElementById('todo-input-deadline');
+        const title = titleEl ? titleEl.value.trim() : '';
+        if (!title) { if (titleEl) titleEl.focus(); return; }
+        const todos = getTodos();
+        todos.push({
+            id:       Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            title,
+            deadline: deadlineEl ? deadlineEl.value : '',
+            done:     false,
+            reminded: false
+        });
+        saveTodos();
+        if (titleEl)    titleEl.value    = '';
+        if (deadlineEl) deadlineEl.value = '';
+        renderTodoList();
+    };
+
+    // ── 切换完成状态 ──
+    window.todoToggleDone = function(id) {
+        const todos = getTodos();
+        const t = todos.find(x => x.id === id);
+        if (t) { t.done = !t.done; saveTodos(); renderTodoList(); }
+    };
+
+    // ── 删除任务 ──
+    window.todoDelete = function(id) {
+        if (typeof settings === 'undefined') return;
+        settings.todos = (settings.todos || []).filter(x => x.id !== id);
+        saveTodos();
+        renderTodoList();
+    };
+
+    // ── 清除已完成 ──
+    window.todoClearDone = function() {
+        if (typeof settings === 'undefined') return;
+        settings.todos = (settings.todos || []).filter(x => !x.done);
+        saveTodos();
+        renderTodoList();
+    };
+
+    // ── 渲染列表 ──
+    function renderTodoList() {
+        const list  = document.getElementById('todo-list');
+        const empty = document.getElementById('todo-empty-hint');
+        if (!list) return;
+        const todos = getTodos();
+
+        // 清空（保留 empty hint 元素）
+        Array.from(list.children).forEach(c => { if (c.id !== 'todo-empty-hint') c.remove(); });
+
+        if (todos.length === 0) {
+            if (empty) empty.style.display = 'block';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+
+        // 未完成优先，按截止时间排序
+        const sorted = [...todos].sort((a, b) => {
+            if (a.done !== b.done) return a.done ? 1 : -1;
+            if (!a.deadline && !b.deadline) return 0;
+            if (!a.deadline) return 1;
+            if (!b.deadline) return -1;
+            return new Date(a.deadline) - new Date(b.deadline);
+        });
+
+        const now = new Date();
+        sorted.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'todo-item' + (t.done ? ' done' : '');
+
+            let deadlineHtml = '';
+            if (t.deadline) {
+                const dl  = new Date(t.deadline);
+                const ms  = dl - now;
+                const isUrgent = !t.done && ms > 0 && ms < 15 * 60 * 1000;
+                const isPast   = ms < 0 && !t.done;
+                const label    = dl.toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+                const cls      = (isUrgent || isPast) ? 'todo-deadline urgent' : 'todo-deadline';
+                const icon     = isPast ? 'fa-exclamation-circle' : 'fa-clock';
+                deadlineHtml = `<div class="${cls}"><i class="fas ${icon}"></i>${label}${isPast ? ' · 已超时' : ''}</div>`;
+            }
+
+            item.innerHTML = `
+                <div class="todo-check ${t.done ? 'checked' : ''}" onclick="window.todoToggleDone('${t.id}')">
+                    ${t.done ? '<i class="fas fa-check" style="font-size:11px;"></i>' : ''}
+                </div>
+                <div class="todo-body">
+                    <div class="todo-title">${escapeHtml(t.title)}</div>
+                    ${deadlineHtml}
+                </div>
+                <button class="todo-delete" onclick="window.todoDelete('${t.id}')" title="删除"><i class="fas fa-trash-alt"></i></button>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── 提醒检查 (每分钟) ──
+    function checkReminders() {
+        const todos = getTodos();
+        const now   = new Date();
+        let triggered = [];
+
+        todos.forEach(t => {
+            if (t.done || t.reminded || !t.deadline) return;
+            const dl = new Date(t.deadline);
+            const ms = dl - now;
+            if (ms >= 0 && ms <= 15 * 60 * 1000) {
+                t.reminded = true;
+                triggered.push({ title: t.title, dl });
+            }
+        });
+
+        if (triggered.length > 0) {
+            saveTodos();
+            const popup   = document.getElementById('todo-reminder-popup');
+            const textEl  = document.getElementById('todo-reminder-text');
+            if (popup && textEl) {
+                textEl.innerHTML = triggered.map(t => {
+                    const mins = Math.round((t.dl - now) / 60000);
+                    return `<b>${escapeHtml(t.title)}</b> — 还剩约 ${mins} 分钟`;
+                }).join('<br>');
+                popup.style.display = 'block';
+                // 10秒后自动关闭
+                setTimeout(() => { popup.style.display = 'none'; }, 10000);
+            }
+            // 尝试浏览器原生通知
+            if ('Notification' in window && Notification.permission === 'granted') {
+                triggered.forEach(t => {
+                    const mins = Math.round((t.dl - now) / 60000);
+                    new Notification('待办提醒', { body: `${t.title} — 还剩约 ${mins} 分钟` });
+                });
+            }
+        }
+    }
+
+    // 请求通知权限
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    // 每60秒检查一次
+    setInterval(checkReminders, 60 * 1000);
+    // 启动时也检查一次（延迟2秒等 settings 就绪）
+    setTimeout(checkReminders, 2000);
+
 })();
