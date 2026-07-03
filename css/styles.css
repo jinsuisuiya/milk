@@ -11029,3 +11029,37 @@
     border-color: var(--accent-color);
     transform: scale(0.93);
 }
+
+/* ===== CSS 预设按钮 (CSS Preset Buttons) ===== */
+.css-preset-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: var(--transition);
+    font-family: var(--font-family);
+}
+.css-preset-btn:hover {
+    border-color: var(--accent-color);
+    background: rgba(var(--accent-color-rgb), 0.06);
+}
+.css-preset-btn:active { transform: scale(0.98); }
+.css-preset-icon { font-size: 20px; flex-shrink: 0; }
+.css-preset-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+.css-preset-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+.css-preset-clear { opacity: 0.6; }
+.css-preset-clear:hover { opacity: 1; border-color: #e85252; background: rgba(232,82,82,0.06); }
