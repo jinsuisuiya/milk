@@ -250,24 +250,14 @@
         showView('list');
     };
 
-    // ── 入口绑定 ──
-    function bindOpenButton() {
-        const btn = document.getElementById('diary-function');
-        if (!btn) return;
-        btn.addEventListener('click', async () => {
-            await loadDiary();
-            renderList();
-            showView('list');
-            const modal = document.getElementById('diary-modal');
-            if (modal) modal.classList.add('active');
-        });
-    }
-
-    // 等 DOM 就绪
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', bindOpenButton);
-    } else {
-        bindOpenButton();
-    }
+    // ── 入口（由 listeners.js 调用） ──
+    window.openDiaryModal = async function() {
+        await loadDiary();
+        renderList();
+        showView('list');
+        const modal = document.getElementById('diary-modal');
+        if (modal && typeof showModal === 'function') showModal(modal);
+        else if (modal) modal.classList.add('active');
+    };
 
 })();

@@ -1417,6 +1417,15 @@ if (_cancelEnvEl) _cancelEnvEl.addEventListener('click', () => {
                 showModal(DOMElements.statsModal.modal);
             });
 
+            // 日记功能入口
+            const _diaryFuncEl = document.getElementById('diary-function');
+            if (_diaryFuncEl) _diaryFuncEl.addEventListener('click', async () => {
+                hideModal(DOMElements.advancedModal.modal);
+                if (typeof window.openDiaryModal === 'function') {
+                    await window.openDiaryModal();
+                }
+            });
+
             const coinFunctionBtn = document.getElementById('coin-function');
             if (coinFunctionBtn) {
                 coinFunctionBtn.addEventListener('click', () => {
@@ -3439,3 +3448,149 @@ document.addEventListener('click', function(e) {
     setTimeout(checkReminders, 2000);
 
 })();
+
+// ════════════════════════════════════════════
+// CSS 预设 (CSS Presets)
+// ════════════════════════════════════════════
+window.applyCssPreset = function(name) {
+    const presets = {
+        'minimal-dark': `/* 夜间极简 - 参考截图风格 */
+:root {
+  --primary-bg: #0a0a0a;
+  --secondary-bg: #111111;
+  --chat-bg: #050505;
+  --text-primary: #e0e0e0;
+  --text-secondary: #555555;
+  --border-color: rgba(255,255,255,0.07);
+  --accent-color: #c8a96e;
+  --accent-color-rgb: 200,169,110;
+  --message-sent-bg: transparent;
+  --message-received-bg: transparent;
+  --input-bg: #111111;
+}
+.message-sent {
+  background: transparent;
+  border: 1px solid rgba(200,169,110,0.35);
+  border-radius: 14px 14px 2px 14px;
+  color: #ddd;
+  box-shadow: none;
+}
+.message-received {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 14px 14px 14px 2px;
+  color: #ccc;
+  box-shadow: none;
+}
+.input-area {
+  background: #0f0f0f;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+#partner-info {
+  background: #0a0a0a;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#message-input {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+}`,
+
+        'warm-white': `/* 暖白日系 */
+:root {
+  --primary-bg: #ffffff;
+  --secondary-bg: #f5f5f5;
+  --chat-bg: #efefef;
+  --text-primary: #1a1a1a;
+  --text-secondary: #999999;
+  --border-color: rgba(0,0,0,0.07);
+  --accent-color: #07c160;
+  --accent-color-rgb: 7,193,96;
+  --message-sent-bg: #d4f0c0;
+  --message-received-bg: #ffffff;
+  --input-bg: #ffffff;
+}
+.message-sent {
+  background: #d4f0c0;
+  border-radius: 14px 2px 14px 14px;
+  color: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.message-received {
+  background: #ffffff;
+  border-radius: 2px 14px 14px 14px;
+  color: #1a1a1a;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.input-area {
+  background: #f5f5f5;
+  border-top: 1px solid rgba(0,0,0,0.07);
+}
+#partner-info {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+#message-input {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 20px;
+  color: #1a1a1a;
+}`,
+
+        'pink-dream': `/* 粉梦少女 */
+:root {
+  --primary-bg: #1a0d1f;
+  --secondary-bg: #231228;
+  --chat-bg: #130a17;
+  --text-primary: #f0e0f5;
+  --text-secondary: #8a6a92;
+  --border-color: rgba(220,160,240,0.1);
+  --accent-color: #e07fd0;
+  --accent-color-rgb: 224,127,208;
+  --message-sent-bg: rgba(224,127,208,0.18);
+  --message-received-bg: rgba(255,255,255,0.05);
+}
+.message-sent {
+  background: rgba(224,127,208,0.2);
+  border: 1px solid rgba(224,127,208,0.3);
+  border-radius: 18px 18px 4px 18px;
+  color: #f0e0f5;
+}
+.message-received {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px 18px 18px 4px;
+  color: #d8b8e8;
+}
+.input-area {
+  background: #1a0d1f;
+  border-top: 1px solid rgba(220,160,240,0.1);
+}
+#partner-info {
+  background: linear-gradient(135deg, #1a0d1f, #231228);
+  border-bottom: 1px solid rgba(220,160,240,0.1);
+}
+#message-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(220,160,240,0.2);
+  border-radius: 20px;
+}`,
+
+        'clear': ''
+    };
+
+    const css = presets[name] ?? '';
+    const textarea = document.getElementById('custom-global-css');
+    if (textarea) {
+        textarea.value = css;
+        textarea.dispatchEvent(new Event('input'));
+    }
+    // 自动应用
+    const applyBtn = document.getElementById('apply-global-css-btn');
+    if (applyBtn) applyBtn.click();
+
+    if (typeof showNotification === 'function') {
+        const labels = { 'minimal-dark':'🌑 夜间极简', 'warm-white':'🤍 暖白日系', 'pink-dream':'🌸 粉梦少女', 'clear':'✕ 已清空预设' };
+        showNotification(name === 'clear' ? '已清空预设 CSS' : `已应用「${labels[name]}」预设`, 'success', 2000);
+    }
+};
