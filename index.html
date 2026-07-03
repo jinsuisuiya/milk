@@ -337,16 +337,19 @@
             </div>
         </div>
 
-        <!-- + 号快捷托盘（仅少用功能） -->
+        <!-- + 号快捷托盘：少用功能 -->
         <div id="quick-tray" style="display:none;">
             <div class="quick-tray-item">
-                <button class="batch-btn input-btn" id="batch-btn" title="批量发送模式"><i class="fas fa-layer-group"></i></button>
-                <span class="quick-tray-label">批量发送</span>
+                <button class="continue-btn input-btn" id="continue-btn" title="让对方继续说"><i class="fas fa-ellipsis-h"></i></button>
+                <span class="quick-tray-label">继续说</span>
+            </div>
+            <div class="quick-tray-item">
+                <button class="input-btn" id="quick-tray-call-btn" title="视频通话" onclick="window.toggleQuickTray();if(window.callFeature&&typeof window.callFeature.startCall==='function')window.callFeature.startCall(false);"><i class="fas fa-video"></i></button>
+                <span class="quick-tray-label">视频通话</span>
             </div>
         </div>
 
         <div class="input-area">
-            <!-- 收纳模式展开按钮（仅收纳模式下显示） -->
             <button id="collapse-expand-btn" title="展开更多" style="display:none;width:36px;height:36px;border:none;border-radius:50%;cursor:pointer;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);font-size:14px;transition:all 0.25s;flex-shrink:0;align-items:center;justify-content:center;" onclick="window.toggleCollapsedExtras && window.toggleCollapsedExtras()"><i class="fas fa-chevron-up"></i></button>
 
             <button class="attachment-btn input-btn" id="attachment-btn" title="发送图片"><i class="fas fa-image"></i></button>
@@ -355,11 +358,8 @@
             <textarea class="message-input" id="message-input" placeholder="" rows="1"></textarea>
 
             <div class="input-buttons">
-                <button class="continue-btn input-btn" id="continue-btn" title="让对方继续说"><i class="fas fa-ellipsis-h"></i></button>
-                <!-- + 号按钮（少用功能） -->
-                <button id="quick-tray-btn" class="input-btn" title="更多功能" onclick="window.toggleQuickTray()">
-                    <i class="fas fa-plus"></i>
-                </button>
+                <button class="batch-btn input-btn" id="batch-btn" title="批量发送模式"><i class="fas fa-layer-group"></i></button>
+                <button id="quick-tray-btn" class="input-btn" title="更多功能" onclick="window.toggleQuickTray()"><i class="fas fa-plus"></i></button>
                 <button class="send-btn input-btn" id="send-btn" title="发送消息"><i class="fas fa-paper-plane"></i></button>
                 <div class="sticker-picker-popover" id="user-sticker-picker">
                     <div class="combo-tabs-header">
@@ -1079,6 +1079,34 @@
 
     <div id="appearance-panel-css" class="appearance-sub-panel" style="display:none;">
         <div class="settings-section">
+            <div class="settings-section-title"><i class="fas fa-magic"></i>快速预设</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5;">点击预设自动填入全局 CSS，点「应用 CSS」生效。</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+
+                <button class="css-preset-btn" onclick="window.applyCssPreset('minimal-dark')">
+                    <span class="css-preset-icon">🌑</span>
+                    <div><div class="css-preset-name">夜间极简</div><div class="css-preset-desc">纯黑底 · 线框气泡 · 参考截图风格</div></div>
+                </button>
+
+                <button class="css-preset-btn" onclick="window.applyCssPreset('warm-white')">
+                    <span class="css-preset-icon">🤍</span>
+                    <div><div class="css-preset-name">暖白日系</div><div class="css-preset-desc">白底 · 绿色发送泡 · 清晨风</div></div>
+                </button>
+
+                <button class="css-preset-btn" onclick="window.applyCssPreset('pink-dream')">
+                    <span class="css-preset-icon">🌸</span>
+                    <div><div class="css-preset-name">粉梦少女</div><div class="css-preset-desc">粉紫渐变底 · 圆润气泡</div></div>
+                </button>
+
+                <button class="css-preset-btn css-preset-clear" onclick="window.applyCssPreset('clear')">
+                    <span class="css-preset-icon">✕</span>
+                    <div><div class="css-preset-name">清空预设</div><div class="css-preset-desc">清除全局 CSS 并还原</div></div>
+                </button>
+
+            </div>
+        </div>
+
+        <div class="settings-section" style="margin-top:18px;">
             <div class="settings-section-title"><i class="fas fa-comment-alt"></i>气泡 CSS</div>
             <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;line-height:1.5;">针对聊天气泡的样式覆盖，选择器限定在消息范围内。</div>
             <textarea id="custom-bubble-css" class="modal-textarea" style="font-family: monospace; font-size: 12px; height: 130px; white-space: pre;" placeholder=".message-sent {
