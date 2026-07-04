@@ -1060,7 +1060,8 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
                 '#typing-indicator-toggle': {
                     prop: 'typingIndicatorEnabled', name: '正在输入'},
                     '#read-no-reply-toggle': { prop: 'allowReadNoReply', name: '已读不回' },
-                    '#emoji-mix-toggle': { prop: 'emojiMixEnabled', name: '表情混入消息' }
+                    '#emoji-mix-toggle': { prop: 'emojiMixEnabled', name: '表情混入消息' },
+                    '#message-recall-toggle': { prop: 'messageRecallEnabled', name: '随机撤回' }
 };
 
             for (const [selector, {
@@ -1080,8 +1081,42 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
                     element.classList.toggle('active', !!settings[prop]);
                     if (prop !== 'soundEnabled') renderMessages(true);
                     showNotification(`${name}已${settings[prop] ? '开启': '关闭'}`, 'success');
+                    // Show/hide recall control panel when recall toggle is clicked
+                    if (prop === 'messageRecallEnabled') {
+                        const recallControl = document.getElementById('message-recall-control');
+                        if (recallControl) recallControl.style.display = settings.messageRecallEnabled ? 'block' : 'none';
+                    }
                 });
             }
+
+            // Initialize recall control visibility
+            const recallControlInit = document.getElementById('message-recall-control');
+            if (recallControlInit) recallControlInit.style.display = settings.messageRecallEnabled ? 'block' : 'none';
+
+            // Recall probability slider
+            const recallSlider = document.getElementById('message-recall-slider');
+            const recallVal = document.getElementById('message-recall-value');
+            if (recallSlider) {
+                recallSlider.value = Math.round((settings.messageRecallChance || 0.10) * 100);
+                if (recallVal) recallVal.textContent = recallSlider.value + '%';
+                recallSlider.addEventListener('input', (e) => {
+                    settings.messageRecallChance = parseInt(e.target.value) / 100;
+                    if (recallVal) recallVal.textContent = e.target.value + '%';
+                });
+                recallSlider.addEventListener('change', throttledSaveData);
+            }
+
+            // Recall side selector
+            const recallSideOpts = document.querySelectorAll('.recall-side-opt');
+            recallSideOpts.forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.side === (settings.messageRecallSide || 'both'));
+                opt.addEventListener('click', () => {
+                    recallSideOpts.forEach(o => o.classList.remove('active'));
+                    opt.classList.add('active');
+                    settings.messageRecallSide = opt.dataset.side;
+                    throttledSaveData();
+                });
+            });
 
             const soundVolSlider = document.getElementById('sound-volume-slider');
             const soundVolVal = document.getElementById('sound-volume-value');

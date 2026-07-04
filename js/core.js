@@ -175,6 +175,7 @@ autoSendInterval: 5,
         readNoReplyChance: 0.2,
         messageRecallEnabled: false,
         messageRecallChance: 0.10,
+        messageRecallSide: 'both',
         timeFormat: 'HH:mm',
         customSoundUrl: '',
         // 音效：两方分别可选（若对应 URL 为空则使用内置预设）
@@ -1207,6 +1208,11 @@ function maybeRecallMessage(message) {
     if (!message || message.type !== 'normal') return message;
     if (typeof settings === 'undefined' || !settings.messageRecallEnabled) return message;
 
+    // Check which side is allowed to withdraw
+    const recallSide = settings.messageRecallSide || 'both';
+    if (recallSide === 'partner' && message.sender === 'user') return message;
+    if (recallSide === 'user' && message.sender !== 'user') return message;
+
     const chance = Math.max(0.05, Math.min(0.15, Number(settings.messageRecallChance) || 0.10));
     if (Math.random() >= chance) return message;
 
@@ -1657,6 +1663,10 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
             if (Math.random() < 0.03) {
                 // ── 对方拍一拍：调用提取的通用函数（同时供 /测试拍一拍 指令使用）──
                 if (typeof window._triggerPartnerPoke === 'function') window._triggerPartnerPoke();
+                // Still schedule a text reply after the poke so the cycle doesn't break
+                const _pokeReplyDelay = (settings.replyDelayMin || 3000) + Math.random() * ((settings.replyDelayMax || 7000) - (settings.replyDelayMin || 3000));
+                if (window._pendingReplyTimer) clearTimeout(window._pendingReplyTimer);
+                window._pendingReplyTimer = setTimeout(() => { window._pendingReplyTimer = null; simulateReply(); }, _pokeReplyDelay);
                 return;
             }
 
