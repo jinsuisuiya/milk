@@ -950,6 +950,29 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         const systemMsgDiv = document.createElement('div');
         systemMsgDiv.className = 'system-message';
         systemMsgDiv.innerHTML = msg.text;
+        // If this is a recalled message and YOU are viewing it, show the retracted content
+        if (msg.recalled && (msg.recalledText || msg.recalledImage)) {
+            const viewLink = document.createElement('span');
+            viewLink.className = 'recall-view-link';
+            viewLink.textContent = ' 查看';
+            viewLink.style.cssText = 'cursor:pointer;color:var(--accent-color,#888);font-size:11px;text-decoration:underline;opacity:0.8;';
+            viewLink.addEventListener('click', () => {
+                const existing = systemMsgDiv.querySelector('.recall-peek');
+                if (existing) { existing.remove(); return; }
+                const peek = document.createElement('div');
+                peek.className = 'recall-peek';
+                peek.style.cssText = 'margin-top:5px;padding:6px 10px;background:rgba(0,0,0,0.08);border-radius:8px;font-size:12px;color:var(--text-secondary);max-width:220px;word-break:break-word;display:inline-block;text-align:left;';
+                if (msg.recalledText) peek.textContent = msg.recalledText;
+                if (msg.recalledImage) {
+                    const img = document.createElement('img');
+                    img.src = msg.recalledImage;
+                    img.style.cssText = 'max-width:100px;border-radius:6px;display:block;margin-top:4px;';
+                    peek.appendChild(img);
+                }
+                systemMsgDiv.appendChild(peek);
+            });
+            systemMsgDiv.appendChild(viewLink);
+        }
         fragment.appendChild(systemMsgDiv);
         lastSenderRef.current = 'system';
         return fragment;
@@ -1472,8 +1495,10 @@ if (!isBatchMode && type === 'normal') {
         if (changed) { _updateReadReceiptsDOM(); throttledSaveData(); }
     }, readDelay);
 
-    if (window._pendingReplyTimer) clearTimeout(window._pendingReplyTimer);
-    window._pendingReplyTimer = null;
+    // Only schedule a reply if there isn't one already pending.
+    // This prevents rapid multi-sends from endlessly pushing the reply timer back,
+    // which would block the partner from replying until you click "continue".
+    if (!window._pendingReplyTimer) {
 
             if (!shouldIgnore) {
         if (settings.typingIndicatorEnabled) {
@@ -1496,6 +1521,7 @@ if (!isBatchMode && type === 'normal') {
             simulateReply();
         }, randomDelay);
     }
+} // end if (!window._pendingReplyTimer)
 }
 };
 

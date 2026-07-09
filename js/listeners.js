@@ -75,17 +75,31 @@ function initChatActionListeners() {
                 if (!message) return;
 
 if (target.classList.contains('delete-btn')) {
-    if (confirm('确定要删除这条消息吗？')) {
-        const index = messages.findIndex(m => m.id === messageId);
-        if (index > -1) {
-            const savedScrollTop = DOMElements.chatContainer.scrollTop;
-            messages.splice(index, 1); 
-            throttledSaveData(); 
+    const index = messages.findIndex(m => m.id === messageId);
+    if (index > -1) {
+        const savedScrollTop = DOMElements.chatContainer.scrollTop;
+        // Partner messages: retract (recall) so you can still view what they said
+        if (message.sender !== 'user') {
+            const who = settings.partnerName || '对方';
+            message.recalled = true;
+            message.recalledText = message.text || null;
+            message.recalledImage = message.image || null;
+            message.type = 'system';
+            message.text = `${who} 撤回了一条消息`;
+            message.image = null;
+            throttledSaveData();
             renderMessages(true);
-            requestAnimationFrame(() => {
-                DOMElements.chatContainer.scrollTop = savedScrollTop;
-            });
-            showNotification('消息已删除', 'success');
+            requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
+            showNotification('消息已撤回（点击「查看」可查看内容）', 'success');
+        } else {
+            // Your own messages: actually delete
+            if (confirm('确定要删除这条消息吗？')) {
+                messages.splice(index, 1);
+                throttledSaveData();
+                renderMessages(true);
+                requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
+                showNotification('消息已删除', 'success');
+            }
         }
     }
     return;
