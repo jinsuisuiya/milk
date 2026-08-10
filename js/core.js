@@ -1082,9 +1082,27 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
         messageHTML += `<div class="reply-indicator" data-reply-id="${msg.replyTo.id || ''}" style="cursor:pointer;" onclick="scrollToQuotedMessage(this)"><span class="reply-indicator-sender">${repliedSender}</span><span class="reply-indicator-text">${repliedText}</span></div>`;
     }
 
-    const isImageOnly = !msg.text && !!msg.image;
+    const hasMultiImages = Array.isArray(msg.images) && msg.images.length > 1;
+    const isImageOnly = !msg.text && (!!msg.image || hasMultiImages);
     let content = msg.text ? `<div>${msg.text.replace(/\n/g, '<br>')}</div>` : '';
-    if (msg.image) content += `<img src="${msg.image}" class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')">`;
+
+    if (hasMultiImages) {
+        const carouselId = `carousel-${msg.id}`;
+        const imgs = msg.images;
+        const slides = imgs.map((src, i) =>
+            `<div class="msg-carousel-slide" data-index="${i}"><img src="${src}" alt="图片${i+1}" onclick="viewImage('${src}')"></div>`
+        ).join('');
+        const dots = imgs.length > 1 ? `<div class="msg-carousel-dots">${imgs.map((_, i) =>
+            `<span class="msg-carousel-dot${i===0?' active':''}" data-carousel="${carouselId}" data-idx="${i}"></span>`
+        ).join('')}</div>` : '';
+        content += `<div class="msg-carousel" id="${carouselId}" data-current="0">
+            <div class="msg-carousel-track">${slides}</div>
+            ${dots}
+            <span class="msg-carousel-counter">1 / ${imgs.length}</span>
+        </div>`;
+    } else if (msg.image) {
+        content += `<img src="${msg.image}" class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')">`;
+    }
     messageHTML += content;
 
     const messageDiv = document.createElement('div');
@@ -1428,8 +1446,9 @@ const addMessage = (message) => {
 
         function sendMessage(textOverride = null, type = 'normal') {
             const text = textOverride || DOMElements.messageInput.value.trim();
-            const imageFile = DOMElements.imageInput.files[0];
-            if (!text && !imageFile && type === 'normal') return;
+            const imageFiles = Array.from(DOMElements.imageInput.files || []);
+            const imageFile = imageFiles[0] || null;
+            if (!text && imageFiles.length === 0 && type === 'normal') return;
 
             // ── 斜杠指令拦截 ──
             if (text && text.startsWith('/') && type === 'normal') {
@@ -1525,7 +1544,37 @@ if (!isBatchMode && type === 'normal') {
 }
 };
 
-            if (imageFile) {
+            if (imageFiles.length > 1) {
+                showNotification(`正在处理 ${imageFiles.length} 张图片...`, 'info', 1500);
+                Promise.all(imageFiles.map(f => optimizeImage(f, 600, 0.8)))
+                    .then(srcs => {
+                        const messageData = {
+                            id: Date.now(),
+                            sender: 'user',
+                            text: text || '',
+                            timestamp: new Date(),
+                            image: null,
+                            images: srcs,
+                            status: 'sent',
+                            favorited: false,
+                            note: null,
+                            replyTo: currentReplyTo,
+                            type: type
+                        };
+                        addMessage(messageData);
+                        playSound('send');
+                        currentReplyTo = null;
+                        updateReplyPreview();
+                        if (!isBatchMode && type === 'normal') {
+                            const delayRange = settings.replyDelayMax - settings.replyDelayMin;
+                            const randomDelay = settings.replyDelayMin + Math.random() * delayRange;
+                            if (!window._pendingReplyTimer) {
+                                window._pendingReplyTimer = setTimeout(() => { window._pendingReplyTimer = null; simulateReply(); }, randomDelay);
+                            }
+                        }
+                    })
+                    .catch(() => showNotification('图片处理失败', 'error'));
+            } else if (imageFile) {
                 showNotification('正在优化图片...', 'info', 1500);
                 optimizeImage(imageFile).then(createMessage).catch(() => showNotification('图片处理失败', 'error'));
             } else {
@@ -1610,7 +1659,14 @@ if (!isBatchMode && type === 'normal') {
             });
             const delayRange = settings.replyDelayMax - settings.replyDelayMin;
             const randomDelay = settings.replyDelayMin + Math.random() * delayRange;
-            setTimeout(simulateReply, batchMessages.length * 300 + randomDelay);
+            if (window._pendingReplyTimer) {
+                clearTimeout(window._pendingReplyTimer);
+                window._pendingReplyTimer = null;
+            }
+            window._pendingReplyTimer = setTimeout(() => {
+                window._pendingReplyTimer = null;
+                simulateReply();
+            }, batchMessages.length * 300 + randomDelay);
             isBatchMode = false; batchMessages = [];
             DOMElements.batchBtn.classList.remove('active'); DOMElements.batchPreview.style.display = 'none';
             const placeholder = "";
@@ -1904,6 +1960,60 @@ function showModal(modalElement, focusElement = null) {
             });
             document.body.appendChild(modal);
         }
+
+        // ── 多图轮播交互 ──
+        function _carouselGoTo(carousel, idx) {
+            const slides = carousel.querySelectorAll('.msg-carousel-slide');
+            const track = carousel.querySelector('.msg-carousel-track');
+            const dots = carousel.querySelectorAll('.msg-carousel-dot');
+            const counter = carousel.querySelector('.msg-carousel-counter');
+            const n = slides.length;
+            idx = Math.max(0, Math.min(n - 1, idx));
+            carousel.dataset.current = idx;
+            if (track) track.style.transform = `translateX(-${idx * 200}px)`;
+            dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+            if (counter) counter.textContent = `${idx + 1} / ${n}`;
+        }
+
+        document.addEventListener('click', e => {
+            const dot = e.target.closest('.msg-carousel-dot');
+            if (!dot) return;
+            const carousel = document.getElementById(dot.dataset.carousel);
+            if (carousel) _carouselGoTo(carousel, Number(dot.dataset.idx));
+        });
+
+        // Touch swipe for carousels
+        document.addEventListener('touchstart', e => {
+            const carousel = e.target.closest('.msg-carousel');
+            if (!carousel) return;
+            carousel._touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+        document.addEventListener('touchend', e => {
+            const carousel = e.target.closest('.msg-carousel');
+            if (!carousel || carousel._touchStartX == null) return;
+            const dx = e.changedTouches[0].clientX - carousel._touchStartX;
+            carousel._touchStartX = null;
+            if (Math.abs(dx) < 30) return;
+            const cur = Number(carousel.dataset.current || 0);
+            _carouselGoTo(carousel, dx < 0 ? cur + 1 : cur - 1);
+        }, { passive: true });
+
+        // Mouse drag for carousels (desktop)
+        document.addEventListener('mousedown', e => {
+            const carousel = e.target.closest('.msg-carousel');
+            if (!carousel) return;
+            carousel._mouseStartX = e.clientX;
+        });
+        document.addEventListener('mouseup', e => {
+            const carousel = e.target.closest('.msg-carousel');
+            if (!carousel || carousel._mouseStartX == null) return;
+            const dx = e.clientX - carousel._mouseStartX;
+            carousel._mouseStartX = null;
+            if (Math.abs(dx) < 20) return;
+            e.preventDefault();
+            const cur = Number(carousel.dataset.current || 0);
+            _carouselGoTo(carousel, dx < 0 ? cur + 1 : cur - 1);
+        });
 
         function exportChatHistory() {
             const overlay = document.createElement('div');

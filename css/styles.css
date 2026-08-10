@@ -1015,6 +1015,141 @@
             border-radius: 12px !important;
         }
 
+        /* ── 待办清单 ── */
+        .todo-filter-btn {
+            border: 1px solid var(--border-color);
+            background: var(--secondary-bg);
+            color: var(--text-secondary);
+            border-radius: 20px;
+            padding: 3px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all .18s;
+        }
+        .todo-filter-btn.active {
+            background: var(--accent-color);
+            color: #fff;
+            border-color: var(--accent-color);
+        }
+        .todo-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 12px;
+            transition: opacity .2s;
+        }
+        .todo-item.done-item { opacity: 0.55; }
+        .todo-item input[type="checkbox"] {
+            margin-top: 2px;
+            accent-color: var(--accent-color);
+            width: 16px; height: 16px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .todo-item-body { flex: 1; min-width: 0; }
+        .todo-item-text {
+            font-size: 13px;
+            color: var(--text-primary);
+            word-break: break-word;
+            line-height: 1.4;
+        }
+        .todo-item.done-item .todo-item-text {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+        }
+        .todo-item-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .todo-tag {
+            font-size: 10px;
+            padding: 1px 7px;
+            border-radius: 10px;
+            background: rgba(var(--accent-color-rgb), 0.12);
+            color: var(--accent-color);
+        }
+        .todo-tag.overdue { background: rgba(220,53,69,.12); color: #dc3545; }
+        .todo-delete-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 6px;
+            font-size: 13px;
+            flex-shrink: 0;
+            transition: color .15s;
+        }
+        .todo-delete-btn:hover { color: #dc3545; }
+        .todo-empty {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 13px;
+            padding: 30px 0;
+        }
+
+        /* ── end todo ── */
+
+        .msg-carousel {
+            position: relative;
+            width: 200px;
+            border-radius: 12px;
+            overflow: hidden;
+            touch-action: pan-y;
+            user-select: none;
+            background: var(--secondary-bg);
+        }
+        .msg-carousel-track {
+            display: flex;
+            transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+            will-change: transform;
+        }
+        .msg-carousel-slide {
+            min-width: 200px;
+            max-width: 200px;
+        }
+        .msg-carousel-slide img {
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+            cursor: pointer;
+        }
+        .msg-carousel-dots {
+            position: absolute;
+            bottom: 6px;
+            left: 0; right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+        .msg-carousel-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: background .2s, transform .2s;
+        }
+        .msg-carousel-dot.active {
+            background: #fff;
+            transform: scale(1.3);
+        }
+        .msg-carousel-counter {
+            position: absolute;
+            top: 6px; right: 8px;
+            font-size: 11px;
+            color: #fff;
+            background: rgba(0,0,0,0.35);
+            border-radius: 8px;
+            padding: 1px 6px;
+            pointer-events: none;
+        }
+
         .message-meta {
             display: flex;
             align-items: center; 

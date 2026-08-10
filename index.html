@@ -364,7 +364,7 @@
             </div>
         </div>
     </div>
-    <input type="file" id="image-input" class="file-input" accept="image/*">
+    <input type="file" id="image-input" class="file-input" accept="image/*" multiple>
     <input type="file" id="my-sticker-quick-upload" class="file-input" accept="image/*" multiple>
 </div>
     </div>
@@ -642,6 +642,10 @@
                 <div class="settings-card" id="data-settings">
                     <i class="fas fa-database"></i>
                     <span>数据管理</span>
+                </div>
+                <div class="settings-card" id="todo-settings">
+                    <i class="fas fa-check-circle"></i>
+                    <span>待办清单</span>
                 </div>
             </div>
 
@@ -2264,6 +2268,7 @@
     <script src="js/features/theme-editor.js"></script>
     <script src="js/features/group-chat.js"></script>
     <script src="js/features/call.js"></script>
+    <script src="js/features/todo.js"></script>
 
     <!-- == 合并模块 == -->
     <script src="js/games.js"></script> 
@@ -2281,5 +2286,63 @@
             });
         }
     </script>
+
+<!-- ══ 待办清单 Modal ══ -->
+<div class="modal" id="todo-modal">
+    <div class="modal-content" style="max-width:420px;max-height:88vh;display:flex;flex-direction:column;">
+        <div class="modal-title">
+            <i class="fas fa-check-circle"></i><span>待办清单</span>
+        </div>
+
+        <!-- 筛选 tabs -->
+        <div id="todo-filter-bar" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+            <button class="todo-filter-btn active" data-filter="all">全部</button>
+            <button class="todo-filter-btn" data-filter="todo">待完成</button>
+            <button class="todo-filter-btn" data-filter="done">已完成</button>
+            <button class="todo-filter-btn" data-filter="high">🔴 高</button>
+            <button class="todo-filter-btn" data-filter="medium">🟡 中</button>
+            <button class="todo-filter-btn" data-filter="low">🟢 低</button>
+        </div>
+
+        <!-- 添加输入区 -->
+        <div id="todo-add-area" style="background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:12px;padding:10px 12px;margin-bottom:12px;">
+            <input id="todo-input-text" type="text" placeholder="添加待办事项..." maxlength="80"
+                style="width:100%;border:none;background:transparent;font-size:13px;color:var(--text-primary);outline:none;margin-bottom:8px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="todo-input-priority" style="flex:1;min-width:80px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-primary);border-radius:8px;padding:4px 8px;font-size:12px;">
+                    <option value="medium">🟡 中优先级</option>
+                    <option value="high">🔴 高优先级</option>
+                    <option value="low">🟢 低优先级</option>
+                </select>
+                <select id="todo-input-category" style="flex:1;min-width:80px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-primary);border-radius:8px;padding:4px 8px;font-size:12px;">
+                    <option value="">📁 无分类</option>
+                    <option value="学习">📚 学习</option>
+                    <option value="生活">🏠 生活</option>
+                    <option value="工作">💼 工作</option>
+                    <option value="娱乐">🎮 娱乐</option>
+                    <option value="其他">📌 其他</option>
+                </select>
+                <input id="todo-input-date" type="date" title="截止日期"
+                    style="flex:1;min-width:100px;border:1px solid var(--border-color);background:var(--primary-bg);color:var(--text-primary);border-radius:8px;padding:4px 8px;font-size:12px;">
+                <button id="todo-add-btn" style="background:var(--accent-color);color:#fff;border:none;border-radius:8px;padding:5px 14px;font-size:12px;cursor:pointer;white-space:nowrap;">
+                    <i class="fas fa-plus"></i> 添加
+                </button>
+            </div>
+        </div>
+
+        <!-- 统计条 -->
+        <div id="todo-stats-bar" style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span id="todo-stats-text"></span>
+            <button id="todo-clear-done" style="background:none;border:none;color:var(--text-secondary);font-size:11px;cursor:pointer;padding:0;">清除已完成</button>
+        </div>
+
+        <!-- 列表 -->
+        <div id="todo-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:100px;"></div>
+
+        <div class="modal-buttons" style="margin-top:14px;">
+            <button class="modal-btn modal-btn-secondary" id="close-todo-modal">关闭</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

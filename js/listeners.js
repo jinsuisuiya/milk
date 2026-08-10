@@ -78,29 +78,18 @@ if (target.classList.contains('delete-btn')) {
     const index = messages.findIndex(m => m.id === messageId);
     if (index > -1) {
         const savedScrollTop = DOMElements.chatContainer.scrollTop;
-        // Partner messages: retract (recall) so you can still view what they said
-        if (message.sender !== 'user') {
-            const who = settings.partnerName || '对方';
-            message.recalled = true;
-            message.recalledText = message.text || null;
-            message.recalledImage = message.image || null;
-            message.type = 'system';
-            message.text = `${who} 撤回了一条消息`;
-            message.image = null;
-            throttledSaveData();
-            renderMessages(true);
-            requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
-            showNotification('消息已撤回（点击「查看」可查看内容）', 'success');
-        } else {
-            // Your own messages: actually delete
-            if (confirm('确定要删除这条消息吗？')) {
-                messages.splice(index, 1);
-                throttledSaveData();
-                renderMessages(true);
-                requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
-                showNotification('消息已删除', 'success');
-            }
-        }
+        // All messages: retract (recall) so you can still view what was said
+        const who = message.sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '对方');
+        message.recalled = true;
+        message.recalledText = message.text || null;
+        message.recalledImage = message.image || null;
+        message.type = 'system';
+        message.text = `${who} 撤回了一条消息`;
+        message.image = null;
+        throttledSaveData();
+        renderMessages(true);
+        requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
+        showNotification('消息已撤回（点击「查看」可查看内容）', 'success');
     }
     return;
 }
@@ -512,6 +501,12 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
             if (_advancedEl) _advancedEl.addEventListener('click', () => {
                 hideModal(DOMElements.settingsModal.modal);
                 showModal(DOMElements.advancedModal.modal);
+            });
+
+            const _todoSettingsEl = document.getElementById('todo-settings');
+            if (_todoSettingsEl) _todoSettingsEl.addEventListener('click', () => {
+                hideModal(DOMElements.settingsModal.modal);
+                if (typeof window._openTodoModal === 'function') window._openTodoModal();
             });
 
             const _dataSettingsEl = document.getElementById('data-settings');
