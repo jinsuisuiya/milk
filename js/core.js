@@ -1089,16 +1089,17 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     if (hasMultiImages) {
         const carouselId = `carousel-${msg.id}`;
         const imgs = msg.images;
+        const savedIdx = (window._carouselPositions && window._carouselPositions.get(msg.id)) || 0;
         const slides = imgs.map((src, i) =>
             `<div class="msg-carousel-slide" data-index="${i}"><img src="${src}" alt="图片${i+1}" onclick="viewImage('${src}')"></div>`
         ).join('');
         const dots = imgs.length > 1 ? `<div class="msg-carousel-dots">${imgs.map((_, i) =>
-            `<span class="msg-carousel-dot${i===0?' active':''}" data-carousel="${carouselId}" data-idx="${i}"></span>`
+            `<span class="msg-carousel-dot${i===savedIdx?' active':''}" data-carousel="${carouselId}" data-idx="${i}"></span>`
         ).join('')}</div>` : '';
-        content += `<div class="msg-carousel" id="${carouselId}" data-current="0">
-            <div class="msg-carousel-track">${slides}</div>
+        content += `<div class="msg-carousel" id="${carouselId}" data-current="${savedIdx}">
+            <div class="msg-carousel-track" style="transform:translateX(-${savedIdx*200}px)">${slides}</div>
             ${dots}
-            <span class="msg-carousel-counter">1 / ${imgs.length}</span>
+            <span class="msg-carousel-counter">${savedIdx+1} / ${imgs.length}</span>
         </div>`;
     } else if (msg.image) {
         content += `<img src="${msg.image}" class="message-image${isImageOnly ? ' message-image-only' : ''}" alt="图片" style="max-width:${isImageOnly ? '100px' : '100px'}; border-radius: 12px;${!isImageOnly ? ' margin-top: 6px;' : ''} cursor: pointer;" onclick="viewImage('${msg.image}')">`;
@@ -1545,6 +1546,9 @@ if (!isBatchMode && type === 'normal') {
 };
 
             if (imageFiles.length > 1) {
+                // Check all file sizes
+                const oversized = imageFiles.find(f => f.size > MAX_IMAGE_SIZE);
+                if (oversized) { showNotification('图片大小不能超过5MB', 'error'); DOMElements.imageInput.value = ''; return; }
                 showNotification(`正在处理 ${imageFiles.length} 张图片...`, 'info', 1500);
                 Promise.all(imageFiles.map(f => optimizeImage(f, 600, 0.8)))
                     .then(srcs => {
@@ -1962,6 +1966,9 @@ function showModal(modalElement, focusElement = null) {
         }
 
         // ── 多图轮播交互 ──
+        window.showModal = showModal;
+        window.hideModal = hideModal;
+        window._carouselPositions = window._carouselPositions || new Map();
         function _carouselGoTo(carousel, idx) {
             const slides = carousel.querySelectorAll('.msg-carousel-slide');
             const track = carousel.querySelector('.msg-carousel-track');
@@ -1973,6 +1980,9 @@ function showModal(modalElement, focusElement = null) {
             if (track) track.style.transform = `translateX(-${idx * 200}px)`;
             dots.forEach((d, i) => d.classList.toggle('active', i === idx));
             if (counter) counter.textContent = `${idx + 1} / ${n}`;
+            // Persist position across re-renders
+            const msgId = Number(carousel.id.replace('carousel-', ''));
+            if (msgId) window._carouselPositions.set(msgId, idx);
         }
 
         document.addEventListener('click', e => {
