@@ -310,39 +310,35 @@
                 modal = this.createModalElement();
                 document.body.appendChild(modal);
             }
-            this.renderModalContent(modal, initialTab);
+            
+            // 确保内部结构已构建
+            this.ensureModalStructure(modal);
+
+            // 加载最新配置到界面
+            this.updateModalData(modal);
+
+            // 切换到指定标签页
+            this.switchTab(modal, initialTab);
 
             // 关闭可能重叠打开的其它弹窗
             ['settings-modal', 'advanced-modal', 'data-modal', 'chat-modal', 'appearance-modal'].forEach(id => {
                 const other = document.getElementById(id);
-                if (other && typeof hideModal === 'function') {
-                    hideModal(other);
-                } else if (other) {
+                if (other) {
+                    if (typeof hideModal === 'function') {
+                        try { hideModal(other); } catch (e) {}
+                    }
                     other.style.display = 'none';
                 }
             });
 
             modal.style.display = 'flex';
-            modal.style.zIndex = '200000';
-            const content = modal.querySelector('.modal-content');
-            if (content) {
-                content.style.opacity = '1';
-                content.style.transform = 'translateY(0) scale(1)';
-            }
-            if (typeof showModal === 'function') {
-                showModal(modal);
-            }
             document.body.style.overflow = 'hidden';
         },
 
         closeModal() {
             const modal = document.getElementById('github-backup-modal');
             if (modal) {
-                if (typeof hideModal === 'function') {
-                    hideModal(modal);
-                } else {
-                    modal.style.display = 'none';
-                }
+                modal.style.display = 'none';
                 document.body.style.overflow = '';
             }
         },
@@ -351,234 +347,295 @@
             const modal = document.createElement('div');
             modal.id = 'github-backup-modal';
             modal.className = 'modal';
-            modal.style.cssText = 'position:fixed;inset:0;z-index:200000;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
-            
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) this.closeModal();
-            });
-
             return modal;
         },
 
-        renderModalContent(modal, activeTab = 'sync') {
-            const cfg = this.getConfig();
-            const hasCreds = !!(cfg.owner && cfg.repo && cfg.token);
-            const lastTimeText = cfg.lastBackupTime ? new Date(cfg.lastBackupTime).toLocaleString() : '暂无记录';
+        ensureModalStructure(modal) {
+            if (modal.querySelector('.github-backup-dialog')) return;
 
             modal.innerHTML = `
-                <div class="modal-content github-backup-dialog" style="background:var(--secondary-bg);border-radius:24px;width:100%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,0.35);border:1px solid var(--border-color);overflow:hidden;animation:modalContentSlideIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards;">
+                <div class="github-backup-dialog" style="background:var(--secondary-bg);border-radius:22px;width:100%;max-width:480px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.35);border:1px solid var(--border-color);overflow:hidden;opacity:1;color:var(--text-primary);">
                     
                     <!-- 顶部标题栏 -->
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px 14px;border-bottom:1px solid var(--border-color);background:var(--secondary-bg);flex-shrink:0;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border-color);background:var(--secondary-bg);flex-shrink:0;">
                         <div style="display:flex;align-items:center;gap:10px;">
-                            <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;">
+                            <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
                                 <i class="fab fa-github"></i>
                             </div>
                             <div>
-                                <div style="font-size:16px;font-weight:700;color:var(--text-primary);font-family:var(--font-family);line-height:1.2;">GitHub 云备份</div>
-                                <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">将聊天记录与设置安全托管至 GitHub</div>
+                                <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.2;">GitHub 云端备份</div>
+                                <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">将聊天记录与个性化设置托管至 GitHub 仓库</div>
                             </div>
                         </div>
-                        <button id="gh-modal-close" style="width:32px;height:32px;border-radius:8px;border:none;background:rgba(var(--accent-color-rgb),0.1);color:var(--accent-color);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.2s;">
-                            <i class="fas fa-xmark"></i>
+                        <button id="gh-modal-close" type="button" style="width:32px;height:32px;border-radius:8px;border:none;background:rgba(var(--accent-color-rgb),0.1);color:var(--accent-color);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.2s;flex-shrink:0;">
+                            <i class="fas fa-times"></i>
                         </button>
                     </div>
 
                     <!-- 标签导航 -->
-                    <div style="display:flex;padding:6px 16px 0;background:var(--secondary-bg);border-bottom:1px solid var(--border-color);gap:8px;flex-shrink:0;">
-                        <button class="gh-tab-btn ${activeTab === 'sync' ? 'active' : ''}" data-tab="sync" style="flex:1;padding:10px;border:none;border-bottom:2.5px solid ${activeTab === 'sync' ? 'var(--accent-color)' : 'transparent'};background:none;color:${activeTab === 'sync' ? 'var(--accent-color)' : 'var(--text-secondary)'};font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:0.2s;font-family:var(--font-family);">
-                            <i class="fas fa-cloud-arrow-up"></i>备份与恢复
+                    <div style="display:flex;padding:4px 16px 0;background:var(--secondary-bg);border-bottom:1px solid var(--border-color);gap:8px;flex-shrink:0;">
+                        <button id="gh-tab-btn-sync" class="gh-tab-btn" data-tab="sync" type="button" style="flex:1;padding:10px 4px;border:none;border-bottom:2.5px solid var(--accent-color);background:none;color:var(--accent-color);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <i class="fas fa-cloud-arrow-up"></i><span>备份与恢复</span>
                         </button>
-                        <button class="gh-tab-btn ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings" style="flex:1;padding:10px;border:none;border-bottom:2.5px solid ${activeTab === 'settings' ? 'var(--accent-color)' : 'transparent'};background:none;color:${activeTab === 'settings' ? 'var(--accent-color)' : 'var(--text-secondary)'};font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:0.2s;font-family:var(--font-family);">
-                            <i class="fas fa-key"></i>授权与仓库设置
+                        <button id="gh-tab-btn-settings" class="gh-tab-btn" data-tab="settings" type="button" style="flex:1;padding:10px 4px;border:none;border-bottom:2.5px solid transparent;background:none;color:var(--text-secondary);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <i class="fas fa-key"></i><span>授权与仓库设置</span>
                         </button>
                     </div>
 
-                    <!-- 滚动内容区 -->
-                    <div id="gh-tab-content" style="flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:16px;">
-                        ${activeTab === 'sync' ? this.renderSyncTabHtml(cfg, hasCreds, lastTimeText) : this.renderSettingsTabHtml(cfg)}
+                    <!-- 主内容区 -->
+                    <div style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px;background:var(--secondary-bg);">
+                        
+                        <!-- Panel 1: 备份与恢复 -->
+                        <div id="gh-panel-sync" style="display:flex;flex-direction:column;gap:14px;">
+                            
+                            <!-- 未配置提示卡片 -->
+                            <div id="gh-unconfigured-card" style="display:none;background:var(--primary-bg);border-radius:16px;border:1px dashed var(--border-color);padding:24px 20px;text-align:center;">
+                                <div style="width:48px;height:48px;border-radius:14px;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px;">
+                                    <i class="fas fa-link-slash"></i>
+                                </div>
+                                <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">尚未配置 GitHub 仓库</div>
+                                <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px;">
+                                    需先配置 GitHub 用户名、仓库名与 Personal Access Token
+                                </div>
+                                <button id="gh-goto-settings-btn" type="button" style="padding:9px 20px;border:none;border-radius:12px;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                                    <i class="fas fa-arrow-right"></i>去配置 GitHub 授权
+                                </button>
+                            </div>
+
+                            <!-- 已配置仓库信息卡片 -->
+                            <div id="gh-configured-card" style="display:none;background:var(--primary-bg);border:1px solid var(--border-color);border-radius:16px;padding:14px 16px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                    <span style="font-size:11px;font-weight:700;color:var(--text-secondary);letter-spacing:0.6px;text-transform:uppercase;">
+                                        <i class="fas fa-code-branch" style="margin-right:4px;"></i>目标仓库
+                                    </span>
+                                    <span id="gh-status-badge" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(59,200,164,0.15);color:#20A882;display:flex;align-items:center;gap:4px;">
+                                        <span style="width:6px;height:6px;border-radius:50%;background:#20A882;"></span>已就绪
+                                    </span>
+                                </div>
+                                <div id="gh-display-repo" style="font-size:14px;font-weight:700;color:var(--text-primary);font-family:monospace;word-break:break-all;margin-bottom:6px;">
+                                    -
+                                </div>
+                                <div style="font-size:11.5px;color:var(--text-secondary);display:flex;flex-direction:column;gap:3px;">
+                                    <div><i class="far fa-file-code" style="width:14px;opacity:0.7"></i> 路径: <code id="gh-display-path" style="color:var(--text-primary)">backup/chatapp-backup.json</code> (<span id="gh-display-branch">main</span>)</div>
+                                    <div><i class="far fa-clock" style="width:14px;opacity:0.7"></i> 上次备份: <span id="gh-last-time" style="color:var(--text-primary)">暂无记录</span></div>
+                                </div>
+                            </div>
+
+                            <!-- 备份内容选项 -->
+                            <div id="gh-backup-options-box" style="background:var(--primary-bg);border:1px solid var(--border-color);border-radius:16px;padding:12px 14px;">
+                                <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                                    <i class="fas fa-sliders-h" style="color:var(--accent-color);"></i>备份内容勾选
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+                                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
+                                        <input type="checkbox" id="gh-opt-msgs" checked style="accent-color:var(--accent-color)"> 聊天记录
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
+                                        <input type="checkbox" id="gh-opt-set" checked style="accent-color:var(--accent-color)"> 外观与设置
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
+                                        <input type="checkbox" id="gh-opt-custom" checked style="accent-color:var(--accent-color)"> 字卡与回复库
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
+                                        <input type="checkbox" id="gh-opt-ann" checked style="accent-color:var(--accent-color)"> 纪念日与倒数
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
+                                        <input type="checkbox" id="gh-opt-themes" checked style="accent-color:var(--accent-color)"> 自定义主题
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
+                                        <input type="checkbox" id="gh-opt-dg" checked style="accent-color:var(--accent-color)"> 今日早报公告
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- 备份与恢复按钮 -->
+                            <div style="display:flex;flex-direction:column;gap:10px;">
+                                <button id="gh-upload-btn" type="button" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,0.15);transition:transform 0.15s;">
+                                    <i class="fas fa-cloud-arrow-up"></i><span>立即备份至 GitHub</span>
+                                </button>
+
+                                <button id="gh-restore-btn" type="button" style="width:100%;padding:12px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--primary-bg);color:var(--text-primary);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.15s;">
+                                    <i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i><span>从 GitHub 恢复数据</span>
+                                </button>
+                            </div>
+
+                            <!-- 操作状态提示 -->
+                            <div id="gh-action-status" style="display:none;padding:10px 12px;border-radius:10px;font-size:12px;text-align:center;line-height:1.5;"></div>
+                        </div>
+
+                        <!-- Panel 2: 授权与仓库设置 -->
+                        <div id="gh-panel-settings" style="display:none;flex-direction:column;gap:12px;">
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
+                                    GitHub 用户名 / 组织名 <span style="color:#e05050">*</span>
+                                </label>
+                                <input id="gh-input-owner" type="text" placeholder="例如: your-username"
+                                    style="width:100%;padding:10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;">
+                            </div>
+
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
+                                    GitHub 仓库名 <span style="color:#e05050">*</span>
+                                </label>
+                                <input id="gh-input-repo" type="text" placeholder="例如: my-chatapp-backup"
+                                    style="width:100%;padding:10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;">
+                                <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">建议在 GitHub 创建 Private（私有）仓库以保护个人隐私</div>
+                            </div>
+
+                            <div>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <label style="font-size:12px;font-weight:700;color:var(--text-primary);">
+                                        GitHub Personal Access Token (PAT) <span style="color:#e05050">*</span>
+                                    </label>
+                                    <a href="https://github.com/settings/tokens/new?scopes=repo&description=ChatApp%20Backup" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--accent-color);text-decoration:none;display:flex;align-items:center;gap:3px;">
+                                        <i class="fas fa-external-link-alt"></i>生成 Token
+                                    </a>
+                                </div>
+                                <div style="position:relative;">
+                                    <input id="gh-input-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                                        style="width:100%;padding:10px 38px 10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;font-family:monospace;">
+                                    <button id="gh-toggle-token" type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px 6px;font-size:13px;">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Token 需勾选 <strong>repo</strong> 权限 (Full control of private repositories)</div>
+                            </div>
+
+                            <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
+                                <div>
+                                    <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
+                                        保存文件路径
+                                    </label>
+                                    <input id="gh-input-path" type="text" placeholder="backup/chatapp-backup.json"
+                                        style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:12.5px;outline:none;box-sizing:border-box;font-family:monospace;">
+                                </div>
+                                <div>
+                                    <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
+                                        分支名
+                                    </label>
+                                    <input id="gh-input-branch" type="text" placeholder="main"
+                                        style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:12.5px;outline:none;box-sizing:border-box;font-family:monospace;">
+                                </div>
+                            </div>
+
+                            <!-- 设置操作按钮 -->
+                            <div style="display:flex;gap:10px;margin-top:4px;">
+                                <button id="gh-test-btn" type="button" style="flex:1;padding:11px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                    <i class="fas fa-vial"></i><span>测试连接</span>
+                                </button>
+                                <button id="gh-save-btn" type="button" style="flex:1;padding:11px;border:none;border-radius:12px;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                                    <i class="fas fa-check"></i><span>保存配置</span>
+                                </button>
+                            </div>
+
+                            <div id="gh-settings-status" style="display:none;padding:10px 12px;border-radius:10px;font-size:12px;text-align:center;line-height:1.5;"></div>
+                        </div>
+
                     </div>
 
                     <!-- 底部提示 -->
-                    <div style="padding:10px 20px 14px;background:var(--primary-bg);border-top:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text-secondary);flex-shrink:0;">
+                    <div style="padding:10px 20px 12px;background:var(--primary-bg);border-top:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text-secondary);flex-shrink:0;">
                         <span style="display:flex;align-items:center;gap:5px;">
-                            <i class="fas fa-shield-alt" style="color:var(--accent-color)"></i>本地加密直连 GitHub API，绝不经过第三方服务器
+                            <i class="fas fa-shield-alt" style="color:var(--accent-color)"></i>本地直连 GitHub API，绝不经过第三方服务器
                         </span>
                     </div>
                 </div>
             `;
 
-            this.bindModalEvents(modal, activeTab);
+            this.bindEvents(modal);
         },
 
-        renderSyncTabHtml(cfg, hasCreds, lastTimeText) {
-            if (!hasCreds) {
-                return `
-                    <div style="background:var(--primary-bg);border-radius:16px;border:1px dashed var(--border-color);padding:24px 20px;text-align:center;">
-                        <div style="width:48px;height:48px;border-radius:14px;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 12px;">
-                            <i class="fas fa-link-slash"></i>
-                        </div>
-                        <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">尚未配置 GitHub 仓库信息</div>
-                        <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px;">
-                            需要配置 GitHub 用户名、仓库名与 Token 才能开启云备份功能。
-                        </div>
-                        <button id="gh-goto-settings-btn" style="padding:9px 20px;border:none;border-radius:12px;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:var(--font-family);">
-                            <i class="fas fa-arrow-right"></i>去配置 GitHub 授权
-                        </button>
-                    </div>
-                `;
+        updateModalData(modal) {
+            const cfg = this.getConfig();
+            const hasCreds = !!(cfg.owner && cfg.repo && cfg.token);
+
+            // 更新输入框内容
+            const ownerInput = modal.querySelector('#gh-input-owner');
+            const repoInput = modal.querySelector('#gh-input-repo');
+            const tokenInput = modal.querySelector('#gh-input-token');
+            const pathInput = modal.querySelector('#gh-input-path');
+            const branchInput = modal.querySelector('#gh-input-branch');
+
+            if (ownerInput) ownerInput.value = cfg.owner || '';
+            if (repoInput) repoInput.value = cfg.repo || '';
+            if (tokenInput) tokenInput.value = cfg.token || '';
+            if (pathInput) pathInput.value = cfg.path || 'backup/chatapp-backup.json';
+            if (branchInput) branchInput.value = cfg.branch || 'main';
+
+            // 更新配置与未配置卡片
+            const unconfiguredCard = modal.querySelector('#gh-unconfigured-card');
+            const configuredCard = modal.querySelector('#gh-configured-card');
+            const displayRepo = modal.querySelector('#gh-display-repo');
+            const displayPath = modal.querySelector('#gh-display-path');
+            const displayBranch = modal.querySelector('#gh-display-branch');
+            const lastTime = modal.querySelector('#gh-last-time');
+
+            if (hasCreds) {
+                if (unconfiguredCard) unconfiguredCard.style.display = 'none';
+                if (configuredCard) configuredCard.style.display = 'block';
+                if (displayRepo) displayRepo.textContent = `${cfg.owner}/${cfg.repo}`;
+                if (displayPath) displayPath.textContent = cfg.path || 'backup/chatapp-backup.json';
+                if (displayBranch) displayBranch.textContent = cfg.branch || 'main';
+                if (lastTime) {
+                    lastTime.textContent = cfg.lastBackupTime ? new Date(cfg.lastBackupTime).toLocaleString() : '暂无记录';
+                }
+            } else {
+                if (unconfiguredCard) unconfiguredCard.style.display = 'block';
+                if (configuredCard) configuredCard.style.display = 'none';
             }
-
-            return `
-                <!-- 仓库连接状态卡片 -->
-                <div style="background:var(--primary-bg);border:1px solid var(--border-color);border-radius:16px;padding:14px 16px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                        <span style="font-size:11px;font-weight:700;color:var(--text-secondary);letter-spacing:0.6px;text-transform:uppercase;">
-                            <i class="fas fa-code-branch" style="margin-right:4px;"></i>目标仓库
-                        </span>
-                        <span id="gh-status-badge" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(59,200,164,0.15);color:#20A882;display:flex;align-items:center;gap:4px;">
-                            <span style="width:6px;height:6px;border-radius:50%;background:#20A882;"></span>已就绪
-                        </span>
-                    </div>
-                    <div style="font-size:14px;font-weight:700;color:var(--text-primary);font-family:monospace;word-break:break-all;margin-bottom:6px;">
-                        ${this.escapeHtml(cfg.owner)}/${this.escapeHtml(cfg.repo)}
-                    </div>
-                    <div style="font-size:11.5px;color:var(--text-secondary);display:flex;flex-direction:column;gap:3px;">
-                        <div><i class="far fa-file-code" style="width:14px;opacity:0.7"></i> 路径: <code style="color:var(--text-primary)">${this.escapeHtml(cfg.path || 'backup/chatapp-backup.json')}</code> (${this.escapeHtml(cfg.branch || 'main')})</div>
-                        <div><i class="far fa-clock" style="width:14px;opacity:0.7"></i> 上次备份: <span id="gh-last-time">${lastTimeText}</span></div>
-                    </div>
-                </div>
-
-                <!-- 备份选项折叠 -->
-                <div style="background:var(--primary-bg);border:1px solid var(--border-color);border-radius:16px;padding:12px 14px;">
-                    <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-                        <i class="fas fa-sliders" style="color:var(--accent-color);"></i>备份内容选项
-                    </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                            <input type="checkbox" id="gh-opt-msgs" checked style="accent-color:var(--accent-color)"> 聊天记录
-                        </label>
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                            <input type="checkbox" id="gh-opt-set" checked style="accent-color:var(--accent-color)"> 外观与设置
-                        </label>
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                            <input type="checkbox" id="gh-opt-custom" checked style="accent-color:var(--accent-color)"> 字卡与回复库
-                        </label>
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                            <input type="checkbox" id="gh-opt-ann" checked style="accent-color:var(--accent-color)"> 纪念日与倒数
-                        </label>
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                            <input type="checkbox" id="gh-opt-themes" checked style="accent-color:var(--accent-color)"> 自定义主题
-                        </label>
-                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                            <input type="checkbox" id="gh-opt-dg" checked style="accent-color:var(--accent-color)"> 今日早报公告
-                        </label>
-                    </div>
-                </div>
-
-                <!-- 操作按钮组 -->
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <button id="gh-upload-btn" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-family);box-shadow:0 4px 14px rgba(0,0,0,0.15);transition:transform 0.15s;">
-                        <i class="fas fa-cloud-arrow-up"></i>立即备份至 GitHub
-                    </button>
-
-                    <button id="gh-restore-btn" style="width:100%;padding:12px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--primary-bg);color:var(--text-primary);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--font-family);transition:background 0.15s;">
-                        <i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i>从 GitHub 恢复数据
-                    </button>
-                </div>
-
-                <!-- 状态反馈区 -->
-                <div id="gh-action-status" style="display:none;padding:10px 12px;border-radius:10px;font-size:12px;text-align:center;line-height:1.5;"></div>
-            `;
         },
 
-        renderSettingsTabHtml(cfg) {
-            return `
-                <div style="display:flex;flex-direction:column;gap:12px;">
-                    <div>
-                        <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
-                            GitHub 用户名 / 组织名 <span style="color:#e05050">*</span>
-                        </label>
-                        <input id="gh-input-owner" type="text" placeholder="例如: your-username" value="${this.escapeHtml(cfg.owner || '')}"
-                            style="width:100%;padding:10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;font-family:var(--font-family);">
-                    </div>
+        switchTab(modal, tabName) {
+            const syncBtn = modal.querySelector('#gh-tab-btn-sync');
+            const settingsBtn = modal.querySelector('#gh-tab-btn-settings');
+            const syncPanel = modal.querySelector('#gh-panel-sync');
+            const settingsPanel = modal.querySelector('#gh-panel-settings');
 
-                    <div>
-                        <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
-                            GitHub 仓库名 <span style="color:#e05050">*</span>
-                        </label>
-                        <input id="gh-input-repo" type="text" placeholder="例如: my-chatapp-backup" value="${this.escapeHtml(cfg.repo || '')}"
-                            style="width:100%;padding:10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;font-family:var(--font-family);">
-                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">建议在 GitHub 创建 Private（私有）仓库以保护个人隐私</div>
-                    </div>
-
-                    <div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                            <label style="font-size:12px;font-weight:700;color:var(--text-primary);">
-                                GitHub Personal Access Token (PAT) <span style="color:#e05050">*</span>
-                            </label>
-                            <a href="https://github.com/settings/tokens/new?scopes=repo&description=ChatApp%20Backup" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--accent-color);text-decoration:none;display:flex;align-items:center;gap:3px;">
-                                <i class="fas fa-external-link-alt"></i>生成 Token
-                            </a>
-                        </div>
-                        <div style="position:relative;">
-                            <input id="gh-input-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" value="${this.escapeHtml(cfg.token || '')}"
-                                style="width:100%;padding:10px 38px 10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;font-family:monospace;">
-                            <button id="gh-toggle-token" type="button" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px 6px;font-size:13px;">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Token 需勾选 <strong>repo</strong> 权限 (Full control of private repositories)</div>
-                    </div>
-
-                    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">
-                        <div>
-                            <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
-                                保存文件路径
-                            </label>
-                            <input id="gh-input-path" type="text" placeholder="backup/chatapp-backup.json" value="${this.escapeHtml(cfg.path || 'backup/chatapp-backup.json')}"
-                                style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:12.5px;outline:none;box-sizing:border-box;font-family:monospace;">
-                        </div>
-                        <div>
-                            <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
-                                分支名
-                            </label>
-                            <input id="gh-input-branch" type="text" placeholder="main" value="${this.escapeHtml(cfg.branch || 'main')}"
-                                style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:12.5px;outline:none;box-sizing:border-box;font-family:monospace;">
-                        </div>
-                    </div>
-
-                    <!-- 操作按钮 -->
-                    <div style="display:flex;gap:10px;margin-top:6px;">
-                        <button id="gh-test-btn" style="flex:1;padding:11px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-family);">
-                            <i class="fas fa-vial"></i>测试连接
-                        </button>
-                        <button id="gh-save-btn" style="flex:1;padding:11px;border:none;border-radius:12px;background:var(--accent-color);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font-family:var(--font-family);">
-                            <i class="fas fa-check"></i>保存配置
-                        </button>
-                    </div>
-
-                    <div id="gh-settings-status" style="display:none;padding:10px 12px;border-radius:10px;font-size:12px;text-align:center;line-height:1.5;"></div>
-                </div>
-            `;
+            if (tabName === 'settings') {
+                if (syncBtn) {
+                    syncBtn.style.borderBottomColor = 'transparent';
+                    syncBtn.style.color = 'var(--text-secondary)';
+                }
+                if (settingsBtn) {
+                    settingsBtn.style.borderBottomColor = 'var(--accent-color)';
+                    settingsBtn.style.color = 'var(--accent-color)';
+                }
+                if (syncPanel) syncPanel.style.display = 'none';
+                if (settingsPanel) settingsPanel.style.display = 'flex';
+            } else {
+                if (syncBtn) {
+                    syncBtn.style.borderBottomColor = 'var(--accent-color)';
+                    syncBtn.style.color = 'var(--accent-color)';
+                }
+                if (settingsBtn) {
+                    settingsBtn.style.borderBottomColor = 'transparent';
+                    settingsBtn.style.color = 'var(--text-secondary)';
+                }
+                if (syncPanel) syncPanel.style.display = 'flex';
+                if (settingsPanel) settingsPanel.style.display = 'none';
+            }
         },
 
-        bindModalEvents(modal, currentTab) {
+        bindEvents(modal) {
+            // 背景点击关闭
+            modal.onclick = (e) => {
+                if (e.target === modal) this.closeModal();
+            };
+
+            // 关闭按钮
             const closeBtn = modal.querySelector('#gh-modal-close');
             if (closeBtn) closeBtn.onclick = () => this.closeModal();
 
-            // 切换 Tab
-            modal.querySelectorAll('.gh-tab-btn').forEach(btn => {
-                btn.onclick = () => {
-                    const tab = btn.dataset.tab;
-                    this.renderModalContent(modal, tab);
-                };
-            });
+            // Tab 切换
+            const syncBtn = modal.querySelector('#gh-tab-btn-sync');
+            const settingsBtn = modal.querySelector('#gh-tab-btn-settings');
+            if (syncBtn) syncBtn.onclick = () => this.switchTab(modal, 'sync');
+            if (settingsBtn) settingsBtn.onclick = () => this.switchTab(modal, 'settings');
 
             // 快捷跳转去设置
             const gotoSettingsBtn = modal.querySelector('#gh-goto-settings-btn');
             if (gotoSettingsBtn) {
-                gotoSettingsBtn.onclick = () => this.renderModalContent(modal, 'settings');
+                gotoSettingsBtn.onclick = () => this.switchTab(modal, 'settings');
             }
 
             // 查看/隐藏 Token
@@ -600,11 +657,14 @@
                     const owner = modal.querySelector('#gh-input-owner')?.value.trim();
                     const repo = modal.querySelector('#gh-input-repo')?.value.trim();
                     const token = modal.querySelector('#gh-input-token')?.value.trim();
-                    const path = modal.querySelector('#gh-input-path')?.value.trim() || 'backup/chatapp-backup.json';
-                    const branch = modal.querySelector('#gh-input-branch')?.value.trim() || 'main';
+
+                    if (!owner || !repo || !token) {
+                        this.showStatus(settingsStatus, '请完整填写用户名、仓库名和 Token', 'error');
+                        return;
+                    }
 
                     testBtn.disabled = true;
-                    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 检测中...';
+                    testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>检测中...</span>';
                     this.showStatus(settingsStatus, '正在连接 GitHub API...', 'info');
 
                     try {
@@ -614,7 +674,7 @@
                         this.showStatus(settingsStatus, `✕ 连接失败: ${err.message}`, 'error');
                     } finally {
                         testBtn.disabled = false;
-                        testBtn.innerHTML = '<i class="fas fa-vial"></i> 测试连接';
+                        testBtn.innerHTML = '<i class="fas fa-vial"></i><span>测试连接</span>';
                     }
                 };
             }
@@ -638,8 +698,10 @@
                     if (typeof showNotification === 'function') showNotification('GitHub 配置已保存', 'success');
                     this.showStatus(settingsStatus, '✓ 配置已保存成功', 'success');
 
+                    this.updateModalData(modal);
+
                     setTimeout(() => {
-                        this.renderModalContent(modal, 'sync');
+                        this.switchTab(modal, 'sync');
                     }, 800);
                 };
             }
@@ -662,8 +724,8 @@
                     }
 
                     uploadBtn.disabled = true;
-                    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在打包并上传至 GitHub...';
-                    this.showStatus(actionStatus, '正在构建备份数据并上传...', 'info');
+                    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>正在打包并上传...</span>';
+                    this.showStatus(actionStatus, '正在构建备份数据并上传至 GitHub...', 'info');
 
                     try {
                         const res = await this.uploadBackup({
@@ -681,7 +743,7 @@
                         this.showStatus(actionStatus, `✕ 上传失败: ${err.message}`, 'error');
                     } finally {
                         uploadBtn.disabled = false;
-                        uploadBtn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i> 立即备份至 GitHub';
+                        uploadBtn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i><span>立即备份至 GitHub</span>';
                     }
                 };
             }
@@ -691,8 +753,8 @@
             if (restoreBtn) {
                 restoreBtn.onclick = async () => {
                     restoreBtn.disabled = true;
-                    restoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在从 GitHub 获取备份...';
-                    this.showStatus(actionStatus, '正在下载并解析远端备份文件...', 'info');
+                    restoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>正在获取备份...</span>';
+                    this.showStatus(actionStatus, '正在从 GitHub 下载并解析备份文件...', 'info');
 
                     try {
                         const { fileInfo, backupData } = await this.fetchBackup();
@@ -719,7 +781,7 @@
                         this.showStatus(actionStatus, `✕ 恢复失败: ${err.message}`, 'error');
                     } finally {
                         restoreBtn.disabled = false;
-                        restoreBtn.innerHTML = '<i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i> 从 GitHub 恢复数据';
+                        restoreBtn.innerHTML = '<i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i><span>从 GitHub 恢复数据</span>';
                     }
                 };
             }

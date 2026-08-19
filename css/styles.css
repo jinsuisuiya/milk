@@ -11198,3 +11198,47 @@
 }
 .css-preset-clear { opacity: 0.6; }
 .css-preset-clear:hover { opacity: 1; border-color: #e85252; background: rgba(232,82,82,0.06); }
+
+/* ══ GitHub 云端备份模态框样式 ══ */
+#github-backup-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 200000 !important;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+#github-backup-modal .github-backup-dialog,
+.github-backup-dialog {
+    background-color: var(--secondary-bg) !important;
+    border-radius: 22px !important;
+    width: 100% !important;
+    max-width: 480px !important;
+    max-height: 88vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35) !important;
+    border: 1px solid var(--border-color) !important;
+    overflow: hidden !important;
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    padding: 0 !important;
+    color: var(--text-primary);
+}
+
+.gh-tab-btn {
+    transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+.gh-tab-btn:hover {
+    background-color: rgba(var(--accent-color-rgb), 0.05);
+}
+
