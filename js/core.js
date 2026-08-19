@@ -949,13 +949,14 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     if (msg.type === 'system') {
         const systemMsgDiv = document.createElement('div');
         systemMsgDiv.className = 'system-message';
+        if (msg.id) systemMsgDiv.dataset.id = msg.id;
         systemMsgDiv.innerHTML = msg.text;
         // If this is a recalled message and YOU are viewing it, show the retracted content
         if (msg.recalled && (msg.recalledText || msg.recalledImage)) {
             const viewLink = document.createElement('span');
             viewLink.className = 'recall-view-link';
             viewLink.textContent = ' 查看';
-            viewLink.style.cssText = 'cursor:pointer;color:var(--accent-color,#888);font-size:11px;text-decoration:underline;opacity:0.8;';
+            viewLink.style.cssText = 'cursor:pointer;color:var(--accent-color,#888);font-size:11px;text-decoration:underline;opacity:0.8;margin-left:4px;';
             viewLink.addEventListener('click', () => {
                 const existing = systemMsgDiv.querySelector('.recall-peek');
                 if (existing) { existing.remove(); return; }
@@ -973,6 +974,29 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
             });
             systemMsgDiv.appendChild(viewLink);
         }
+
+        // 允许删除系统消息/撤回提示
+        if (msg.id) {
+            const delSysBtn = document.createElement('span');
+            delSysBtn.className = 'system-msg-del-btn';
+            delSysBtn.innerHTML = ' &times;';
+            delSysBtn.title = '删除此条记录';
+            delSysBtn.style.cssText = 'cursor:pointer;opacity:0.4;font-size:13px;margin-left:6px;transition:opacity 0.2s;';
+            delSysBtn.onmouseenter = () => delSysBtn.style.opacity = '1';
+            delSysBtn.onmouseleave = () => delSysBtn.style.opacity = '0.4';
+            delSysBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = messages.findIndex(m => m.id === msg.id);
+                if (idx > -1) {
+                    messages.splice(idx, 1);
+                    throttledSaveData();
+                    renderMessages(true);
+                    showNotification('记录已删除', 'success');
+                }
+            });
+            systemMsgDiv.appendChild(delSysBtn);
+        }
+
         fragment.appendChild(systemMsgDiv);
         lastSenderRef.current = 'system';
         return fragment;
@@ -1118,6 +1142,9 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
     if (settings.replyEnabled) actionsHTML += `<button class="meta-action-btn reply-btn" title="回复"><i class="fas fa-reply"></i></button>`;
     const starIcon = msg.favorited ? 'fas fa-star' : 'far fa-star';
     actionsHTML += `<button class="meta-action-btn favorite-action-btn ${msg.favorited ? 'favorited' : ''}" title="${msg.favorited ? '取消收藏' : '收藏'}"><i class="${starIcon}"></i></button>`;
+    if (settings.messageRecallEnabled) {
+        actionsHTML += `<button class="meta-action-btn recall-btn" title="撤回"><i class="fas fa-undo"></i></button>`;
+    }
     actionsHTML += `<button class="meta-action-btn delete-btn" title="删除"><i class="fas fa-trash-alt"></i></button>`;
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'message-meta-actions';

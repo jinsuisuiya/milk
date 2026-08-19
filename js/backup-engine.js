@@ -22,6 +22,28 @@
             (u[3] === 0x04 || u[3] === 0x06 || u[3] === 0x08);
     }
 
+    function isGzipArrayBuffer(ab) {
+        if (!ab || ab.byteLength < 2) return false;
+        var u = new Uint8Array(ab);
+        return u[0] === 0x1f && u[1] === 0x8b;
+    }
+
+    async function decompressGzip(ab) {
+        try {
+            if (typeof DecompressionStream !== 'undefined') {
+                var ds = new DecompressionStream('gzip');
+                var writer = ds.writable.getWriter();
+                writer.write(ab);
+                writer.close();
+                var res = new Response(ds.readable);
+                return await res.arrayBuffer();
+            }
+        } catch (e) {
+            console.warn('[backup] GZIP 解压异常，尝试直接解析:', e);
+        }
+        return ab;
+    }
+
     function dataUrlToBinary(dataUrl) {
         if (typeof dataUrl !== 'string') return null;
         var m = /^data:([^,]+),([\s\S]*)$/.exec(dataUrl);
@@ -319,10 +341,53 @@
     }
 
     async function loadBackupFromArrayBuffer(ab) {
-        if (isZipArrayBuffer(ab)) return await parseZipBackup(ab);
+        if (!ab || ab.byteLength === 0) {
+            throw new Error('备份文件内容为空');
+        }
+
+        // 1. 检查是否为 ZIP 压缩包 (v5 或旧版 ZIP)
+        if (isZipArrayBuffer(ab)) {
+            return await parseZipBackup(ab);
+        }
+
+        // 2. 检查是否为 GZIP 压缩数据
+        if (isGzipArrayBuffer(ab)) {
+            ab = await decompressGzip(ab);
+            if (isZipArrayBuffer(ab)) {
+                return await parseZipBackup(ab);
+            }
+        }
+
+        // 3. 解码为文本
         var text = new TextDecoder('utf-8', { fatal: false }).decode(ab);
-        if (text.length && text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-        return JSON.parse(text);
+        
+        // 清理 UTF-8 BOM 和首尾空白
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        text = text.trim();
+
+        // 4. 清理 Markdown 代码块包裹（例如 ```json ... ```）
+        if (text.startsWith('```')) {
+            text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        }
+
+        // 5. 尝试直接 JSON 解析
+        try {
+            return JSON.parse(text);
+        } catch (jsonErr) {
+            // 6. 容错尝试：检查是否为 Base64 编码的 JSON
+            if (/^[A-Za-z0-9+/=\s]+$/.test(text) && text.length > 20) {
+                try {
+                    var cleanB64 = text.replace(/\s/g, '');
+                    var decodedBin = atob(cleanB64);
+                    var u8 = new Uint8Array(decodedBin.length);
+                    for (var i = 0; i < decodedBin.length; i++) u8[i] = decodedBin.charCodeAt(i);
+                    return await loadBackupFromArrayBuffer(u8.buffer);
+                } catch (b64Err) {}
+            }
+
+            console.error('[backup] JSON 解析失败. 错误信息:', jsonErr, '文本前100字符:', text.slice(0, 100));
+            throw new Error('备份文件解析失败：文件不是标准 JSON 或 ZIP 格式 (' + jsonErr.message + ')');
+        }
     }
 
     async function loadBackupFromFile(file) {

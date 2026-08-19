@@ -93,25 +93,37 @@ function initChatActionListeners() {
                 const message = messages.find(m => m.id === messageId);
                 if (!message) return;
 
-if (target.classList.contains('delete-btn')) {
-    const index = messages.findIndex(m => m.id === messageId);
-    if (index > -1) {
-        const savedScrollTop = DOMElements.chatContainer.scrollTop;
-        // All messages: retract (recall) so you can still view what was said
-        const who = message.sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '对方');
-        message.recalled = true;
-        message.recalledText = message.text || null;
-        message.recalledImage = message.image || null;
-        message.type = 'system';
-        message.text = `${who} 撤回了一条消息`;
-        message.image = null;
-        throttledSaveData();
-        renderMessages(true);
-        requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
-        showNotification('消息已撤回（点击「查看」可查看内容）', 'success');
-    }
-    return;
-}
+                if (target.classList.contains('delete-btn') || target.closest('.delete-btn')) {
+                    const index = messages.findIndex(m => m.id === messageId);
+                    if (index > -1) {
+                        const savedScrollTop = DOMElements.chatContainer.scrollTop;
+                        messages.splice(index, 1);
+                        throttledSaveData();
+                        renderMessages(true);
+                        requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
+                        showNotification('消息已删除', 'success');
+                    }
+                    return;
+                }
+
+                if (target.classList.contains('recall-btn') || target.closest('.recall-btn')) {
+                    const index = messages.findIndex(m => m.id === messageId);
+                    if (index > -1) {
+                        const savedScrollTop = DOMElements.chatContainer.scrollTop;
+                        const who = message.sender === 'user' ? (settings.myName || '我') : (settings.partnerName || '对方');
+                        message.recalled = true;
+                        message.recalledText = message.text || null;
+                        message.recalledImage = message.image || null;
+                        message.type = 'system';
+                        message.text = `${who} 撤回了一条消息`;
+                        message.image = null;
+                        throttledSaveData();
+                        renderMessages(true);
+                        requestAnimationFrame(() => { DOMElements.chatContainer.scrollTop = savedScrollTop; });
+                        showNotification('消息已撤回（点击「查看」可查看内容）', 'success');
+                    }
+                    return;
+                }
                 if (target.classList.contains('reply-btn')) {
                     currentReplyTo = {
                         id: message.id,

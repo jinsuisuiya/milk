@@ -45,28 +45,45 @@
             }
         },
 
-        // UTF-8 字符串转 Base64（支持中文与大文本）
-        utf8ToBase64(str) {
-            const bytes = new TextEncoder().encode(str);
-            let binary = '';
-            const len = bytes.byteLength;
-            const chunk = 0x8000;
-            for (let i = 0; i < len; i += chunk) {
-                binary += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, len)));
+        // 原生高效 Base64 转换（基于 Blob + FileReader，无调用栈溢出，支持百兆大文件）
+        async arrayBufferToBase64(buffer) {
+            return new Promise((resolve, reject) => {
+                const blob = new Blob([buffer], { type: 'application/octet-stream' });
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = reader.result || '';
+                    const commaIdx = dataUrl.indexOf(',');
+                    resolve(commaIdx !== -1 ? dataUrl.substring(commaIdx + 1) : '');
+                };
+                reader.onerror = (e) => reject(new Error('Base64 编码失败: ' + e.message));
+                reader.readAsDataURL(blob);
+            });
+        },
+
+        async stringToBase64(str) {
+            const u8 = new TextEncoder().encode(str);
+            return await this.arrayBufferToBase64(u8.buffer);
+        },
+
+        // Base64 转 ArrayBuffer
+        async base64ToArrayBuffer(b64) {
+            const clean = b64.replace(/\s/g, '');
+            try {
+                const res = await fetch(`data:application/octet-stream;base64,${clean}`);
+                return await res.arrayBuffer();
+            } catch (e) {
+                const binary = atob(clean);
+                const len = binary.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+                return bytes.buffer;
             }
-            return btoa(binary);
         },
 
         // Base64 转 UTF-8 字符串
-        base64ToUtf8(b64) {
-            const clean = b64.replace(/\s/g, '');
-            const binary = atob(clean);
-            const len = binary.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            return new TextDecoder('utf-8').decode(bytes);
+        async base64ToUtf8(b64) {
+            const ab = await this.base64ToArrayBuffer(b64);
+            return new TextDecoder('utf-8').decode(ab);
         },
 
         // 测试 GitHub 连通性与权限
@@ -155,7 +172,7 @@
             };
         },
 
-        // 上传备份至 GitHub
+        // 上传备份至 GitHub (支持任意体量大文件：通过 Git Data Blobs API 或 Contents API)
         async uploadBackup(options = {}) {
             const cfg = this.getConfig();
             const token = (cfg.token || '').trim();
@@ -170,7 +187,7 @@
 
             // 1. 构建备份数据包
             if (typeof ChatBackup === 'undefined' || !ChatBackup.buildBackupPayload || !ChatBackup.serializeBackupV4) {
-                throw new Error('备份引擎未完全就绪，请刷新页面后重试');
+                throw new Error('备份引擎未就绪，请刷新页面后重试');
             }
 
             const payload = await ChatBackup.buildBackupPayload({
@@ -191,48 +208,175 @@
             };
 
             const jsonStr = ChatBackup.serializeBackupV4(payload);
-            const base64Content = this.utf8ToBase64(jsonStr);
+            const rawBytes = new TextEncoder().encode(jsonStr);
+            const fileSize = rawBytes.byteLength;
 
-            // 2. 检查远端文件是否已有 sha
-            const remoteInfo = await this.getRemoteFileInfo(cfg);
-            const sha = remoteInfo.exists ? remoteInfo.sha : undefined;
+            // 2. 转换为高效 Base64
+            const base64Content = await this.arrayBufferToBase64(rawBytes.buffer);
 
-            // 3. 提交到 GitHub
-            const commitMessage = options.commitMessage || `Data Backup: ${new Date().toLocaleString()} (传讯数据备份)`;
-            const body = {
-                message: commitMessage,
-                content: base64Content,
-                branch: branch
+            const commitMessage = options.commitMessage || `Data Backup: ${new Date().toLocaleString()} (传讯数据备份 - ${(fileSize / 1024).toFixed(1)} KB)`;
+            const headers = {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'ChatApp-Backup'
             };
-            if (sha) {
-                body.sha = sha;
-            }
 
-            const putUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(path)}`;
-            const putRes = await fetch(putUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'ChatApp-Backup'
-                },
-                body: JSON.stringify(body)
-            });
+            let commitUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
+            let newSha = null;
 
-            if (!putRes.ok) {
-                const errData = await putRes.json().catch(() => ({}));
-                if (putRes.status === 409) {
-                    throw new Error('提交冲突 (409 Conflict)，请重试');
+            // 3. 智能选择上传策略：
+            // 如果文件小于 1.5MB，尝试 Contents API（直观、单步）；如果大于 1.5MB 或 Contents API 报错，自动升迁为 Git Data API (Blobs -> Trees -> Commits)
+            let useGitDataApi = fileSize > 1500000;
+
+            if (!useGitDataApi) {
+                try {
+                    const remoteInfo = await this.getRemoteFileInfo(cfg);
+                    const body = {
+                        message: commitMessage,
+                        content: base64Content,
+                        branch: branch
+                    };
+                    if (remoteInfo.exists && remoteInfo.sha) {
+                        body.sha = remoteInfo.sha;
+                    }
+
+                    const putUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(path)}`;
+                    const putRes = await fetch(putUrl, {
+                        method: 'PUT',
+                        headers,
+                        body: JSON.stringify(body)
+                    });
+
+                    if (putRes.ok) {
+                        const resData = await putRes.json();
+                        newSha = resData.content?.sha || resData.commit?.sha;
+                        commitUrl = resData.commit?.html_url || commitUrl;
+                    } else {
+                        // 如果 Contents API 因文件体量或冲突返回错误，自动切换为 Git Data API
+                        console.warn(`[GitHubBackup] Contents API 返回 ${putRes.status}，切换为 Git Data API 处理大文件`);
+                        useGitDataApi = true;
+                    }
+                } catch (e) {
+                    useGitDataApi = true;
                 }
-                throw new Error(`上传失败 (${putRes.status}): ${errData.message || putRes.statusText}`);
             }
 
-            const resData = await putRes.json();
-            const newSha = resData.content?.sha || resData.commit?.sha;
-            const commitUrl = resData.commit?.html_url || `https://github.com/${owner}/${repo}/blob/${branch}/${path}`;
+            // 4. Git Data API 上传大文件（支持最高 100MB，不触发 Contents API 体量限制）
+            if (useGitDataApi) {
+                // Step A: 创建 Git Blob
+                const blobUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs`;
+                const blobRes = await fetch(blobUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        content: base64Content,
+                        encoding: 'base64'
+                    })
+                });
 
-            // 4. 更新本地同步状态
+                if (!blobRes.ok) {
+                    const err = await blobRes.json().catch(() => ({}));
+                    throw new Error(`创建数据块失败 (${blobRes.status}): ${err.message || blobRes.statusText}`);
+                }
+                const blobData = await blobRes.json();
+                const blobSha = blobData.sha;
+
+                // Step B: 获取目标分支的最新 Commit
+                const branchUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodeURIComponent(branch)}`;
+                const branchRes = await fetch(branchUrl, { headers });
+
+                let latestCommitSha = null;
+                let baseTreeSha = null;
+
+                if (branchRes.ok) {
+                    const branchData = await branchRes.json();
+                    latestCommitSha = branchData.commit?.sha;
+                    baseTreeSha = branchData.commit?.commit?.tree?.sha;
+                }
+
+                // Step C: 创建 Tree
+                const treeUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees`;
+                const treeBody = {
+                    tree: [{
+                        path: path,
+                        mode: '100644',
+                        type: 'blob',
+                        sha: blobSha
+                    }]
+                };
+                if (baseTreeSha) {
+                    treeBody.base_tree = baseTreeSha;
+                }
+
+                const treeRes = await fetch(treeUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(treeBody)
+                });
+
+                if (!treeRes.ok) {
+                    const err = await treeRes.json().catch(() => ({}));
+                    throw new Error(`创建文件树失败 (${treeRes.status}): ${err.message || treeRes.statusText}`);
+                }
+                const treeData = await treeRes.json();
+                const newTreeSha = treeData.sha;
+
+                // Step D: 创建 Commit
+                const commitApiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits`;
+                const commitBody = {
+                    message: commitMessage,
+                    tree: newTreeSha,
+                    parents: latestCommitSha ? [latestCommitSha] : []
+                };
+
+                const commitRes = await fetch(commitApiUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(commitBody)
+                });
+
+                if (!commitRes.ok) {
+                    const err = await commitRes.json().catch(() => ({}));
+                    throw new Error(`创建提交失败 (${commitRes.status}): ${err.message || commitRes.statusText}`);
+                }
+                const commitData = await commitRes.json();
+                const newCommitSha = commitData.sha;
+
+                // Step E: 更新分支引用 (Ref)
+                const refUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branch)}`;
+                let refRes = await fetch(refUrl, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({
+                        sha: newCommitSha,
+                        force: true
+                    })
+                });
+
+                // 如果分支尚未创建，则创建新分支引用
+                if (refRes.status === 404 || refRes.status === 422) {
+                    const createRefUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs`;
+                    refRes = await fetch(createRefUrl, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                            ref: `refs/heads/${branch}`,
+                            sha: newCommitSha
+                        })
+                    });
+                }
+
+                if (!refRes.ok) {
+                    const err = await refRes.json().catch(() => ({}));
+                    throw new Error(`更新分支引用失败 (${refRes.status}): ${err.message || refRes.statusText}`);
+                }
+
+                newSha = newCommitSha;
+                commitUrl = `https://github.com/${owner}/${repo}/commit/${newCommitSha}`;
+            }
+
+            // 5. 更新本地同步状态
             const nowTime = new Date().toISOString();
             this.saveConfig({
                 lastBackupTime: nowTime,
@@ -245,11 +389,11 @@
                 time: nowTime,
                 sha: newSha,
                 url: commitUrl,
-                size: jsonStr.length
+                size: fileSize
             };
         },
 
-        // 从 GitHub 拉取备份文件
+        // 从 GitHub 拉取备份文件 (支持任意体量大文件与多种压缩格式)
         async fetchBackup() {
             const cfg = this.getConfig();
             const token = (cfg.token || '').trim();
@@ -262,34 +406,79 @@
                 throw new Error('请先在设置中填写 GitHub 用户名、仓库名和 Token');
             }
 
-            const fileInfo = await this.getRemoteFileInfo(cfg);
-            if (!fileInfo.exists) {
-                throw new Error(`仓库中未找到备份文件: ${path} (分支: ${branch})`);
-            }
+            // 1. 优先使用 Raw 接口直接流式下载二进制（避免 1MB 截断、CORS 和 Base64 膨胀问题）
+            const rawUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`;
+            let ab = null;
 
-            let jsonStr = '';
-            if (fileInfo.content && fileInfo.encoding === 'base64') {
-                jsonStr = this.base64ToUtf8(fileInfo.content);
-            } else if (fileInfo.downloadUrl) {
-                const rawRes = await fetch(fileInfo.downloadUrl, {
-                    headers: { 'Authorization': `token ${token}` }
-                });
-                if (!rawRes.ok) throw new Error('下载备份文件内容失败');
-                jsonStr = await rawRes.text();
-            } else {
-                throw new Error('无法解析远端文件内容');
-            }
-
-            let backupData;
             try {
-                if (jsonStr.charCodeAt(0) === 0xFEFF) jsonStr = jsonStr.slice(1);
-                backupData = JSON.parse(jsonStr);
-            } catch (e) {
-                throw new Error('远端备份文件损坏或不是有效的 JSON 格式');
+                const rawRes = await fetch(rawUrl, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3.raw',
+                        'User-Agent': 'ChatApp-Backup'
+                    }
+                });
+
+                if (rawRes.ok) {
+                    ab = await rawRes.arrayBuffer();
+                } else if (rawRes.status === 404) {
+                    throw new Error(`仓库中未找到备份文件: ${path} (分支: ${branch})`);
+                } else if (rawRes.status === 401) {
+                    throw new Error('GitHub Token 无效或已过期 (401 Unauthorized)');
+                }
+            } catch (rawErr) {
+                if (rawErr.message.indexOf('未找到') !== -1 || rawErr.message.indexOf('401') !== -1) {
+                    throw rawErr;
+                }
+                console.warn('[GitHubBackup] Raw 模式拉取失败，尝试元数据解析:', rawErr);
             }
 
+            // 2. 回退机制：如果 Raw 接口未成功获取，则获取元数据
+            if (!ab || ab.byteLength === 0) {
+                const fileInfo = await this.getRemoteFileInfo(cfg);
+                if (!fileInfo.exists) {
+                    throw new Error(`仓库中未找到备份文件: ${path} (分支: ${branch})`);
+                }
+
+                if (fileInfo.sha) {
+                    // 通过 Git Blob API 获取
+                    const blobUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${fileInfo.sha}`;
+                    const blobRes = await fetch(blobUrl, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3.raw',
+                            'User-Agent': 'ChatApp-Backup'
+                        }
+                    });
+                    if (blobRes.ok) {
+                        ab = await blobRes.arrayBuffer();
+                    }
+                }
+
+                if ((!ab || ab.byteLength === 0) && fileInfo.content && fileInfo.encoding === 'base64') {
+                    ab = await this.base64ToArrayBuffer(fileInfo.content);
+                }
+
+                if ((!ab || ab.byteLength === 0) && fileInfo.downloadUrl) {
+                    const dlRes = await fetch(fileInfo.downloadUrl, {
+                        headers: { 'Authorization': `token ${token}` }
+                    });
+                    if (dlRes.ok) ab = await dlRes.arrayBuffer();
+                }
+            }
+
+            if (!ab || ab.byteLength === 0) {
+                throw new Error('未能从 GitHub 下载到有效备份数据');
+            }
+
+            // 3. 使用备份引擎的万能多格式解析器解析数据（支持 ZIP、GZIP、标准 JSON、BOM 头）
+            if (typeof ChatBackup === 'undefined' || !ChatBackup.loadBackupFromArrayBuffer) {
+                throw new Error('备份解析引擎未就绪');
+            }
+
+            const backupData = await ChatBackup.loadBackupFromArrayBuffer(ab);
             return {
-                fileInfo,
+                fileInfo: { size: ab.byteLength },
                 backupData
             };
         },
