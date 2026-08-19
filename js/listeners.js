@@ -1479,6 +1479,16 @@ if (_cancelEnvEl) _cancelEnvEl.addEventListener('click', () => {
                     handleCoinToss();
                 });
             }
+            const floatingCompanionBtn = document.getElementById('floating-companion-function');
+            if (floatingCompanionBtn) {
+                floatingCompanionBtn.addEventListener('click', () => {
+                    hideModal(DOMElements.advancedModal.modal);
+                    if (typeof window.openFloatingCompanionModal === 'function') {
+                        window.openFloatingCompanionModal();
+                    }
+                });
+            }
+
             const musicToggle = document.getElementById('music-player-toggle');
             musicToggle.addEventListener('click', () => {
                 settings.musicPlayerEnabled = !settings.musicPlayerEnabled;

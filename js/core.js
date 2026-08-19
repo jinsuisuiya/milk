@@ -1344,6 +1344,10 @@ const addMessage = (message) => {
         container.scrollTop = container.scrollHeight;
     });
 
+    try {
+        window.dispatchEvent(new CustomEvent('app-new-message-received', { detail: message }));
+    } catch (e) {}
+
     throttledSaveData();
 };
 
@@ -1563,7 +1567,8 @@ if (!isBatchMode && type === 'normal') {
             }
             if (DOMElements.chatContainer) DOMElements.chatContainer.scrollTop = DOMElements.chatContainer.scrollHeight;
         }
-        window._pendingReplyTimer = setTimeout(() => {
+        const timerFn = window._preciseTimeout || setTimeout;
+        window._pendingReplyTimer = timerFn(() => {
             window._pendingReplyTimer = null;
             simulateReply();
         }, randomDelay);
@@ -1600,7 +1605,8 @@ if (!isBatchMode && type === 'normal') {
                             const delayRange = settings.replyDelayMax - settings.replyDelayMin;
                             const randomDelay = settings.replyDelayMin + Math.random() * delayRange;
                             if (!window._pendingReplyTimer) {
-                                window._pendingReplyTimer = setTimeout(() => { window._pendingReplyTimer = null; simulateReply(); }, randomDelay);
+                                const timerFn = window._preciseTimeout || setTimeout;
+                                window._pendingReplyTimer = timerFn(() => { window._pendingReplyTimer = null; simulateReply(); }, randomDelay);
                             }
                         }
                     })
@@ -1691,10 +1697,15 @@ if (!isBatchMode && type === 'normal') {
             const delayRange = settings.replyDelayMax - settings.replyDelayMin;
             const randomDelay = settings.replyDelayMin + Math.random() * delayRange;
             if (window._pendingReplyTimer) {
-                clearTimeout(window._pendingReplyTimer);
+                if (typeof window._clearPreciseTimeout === 'function') {
+                    window._clearPreciseTimeout(window._pendingReplyTimer);
+                } else {
+                    clearTimeout(window._pendingReplyTimer);
+                }
                 window._pendingReplyTimer = null;
             }
-            window._pendingReplyTimer = setTimeout(() => {
+            const timerFn = window._preciseTimeout || setTimeout;
+            window._pendingReplyTimer = timerFn(() => {
                 window._pendingReplyTimer = null;
                 simulateReply();
             }, batchMessages.length * 300 + randomDelay);
