@@ -45,6 +45,13 @@
         +       '<i class="fas fa-chevron-right dm-tile-arrow"></i>'
         +     '</div>'
         +   '</div>'
+        +   '<div class="dm-row-card" style="margin-top:2px;">'
+        +     '<div class="dm-row-item" id="dm-row-github-backup" style="cursor:pointer">'
+        +       '<div class="dm-row-icon" style="background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff"><i class="fab fa-github"></i></div>'
+        +       '<div class="dm-row-info"><div class="dm-row-title">GitHub 云端备份与恢复</div><div class="dm-row-desc">使用 GitHub Token 备份到指定仓库，支持跨端恢复</div></div>'
+        +       '<button class="dm-nav-btn"><i class="fas fa-chevron-right"></i></button>'
+        +     '</div>'
+        +   '</div>'
 
         +   '<div style="display:none">'
         +     '<button id="export-all-settings"></button>'
@@ -110,6 +117,10 @@
         +       '<button class="dm-drawer-action-btn" id="import-all-settings-real">'
         +         '<div class="dm-drawer-btn-icon"><i class="fas fa-upload"></i></div>'
         +         '<div class="dm-drawer-btn-text"><div class="dm-drawer-btn-title">从文件恢复</div><div class="dm-drawer-btn-desc">选择之前导出的备份文件</div></div>'
+        +       '</button>'
+        +       '<button class="dm-drawer-action-btn" id="github-backup-drawer-btn" style="background:rgba(var(--accent-color-rgb),0.05);border-color:rgba(var(--accent-color-rgb),0.25);">'
+        +         '<div class="dm-drawer-btn-icon" style="background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff"><i class="fab fa-github"></i></div>'
+        +         '<div class="dm-drawer-btn-text"><div class="dm-drawer-btn-title">GitHub 云备份</div><div class="dm-drawer-btn-desc">同步与恢复至 GitHub 仓库</div></div>'
         +       '</button>'
         +     '</div>'
         +     '<button class="dm-drawer-cancel" id="dm-drawer-full-cancel">取消</button>'
@@ -279,6 +290,15 @@
         var tileChatBackup = mc.querySelector('#dm-tile-chat-backup');
         if (tileChatBackup) tileChatBackup.addEventListener('click', function () { openDrawer('dm-drawer-chat'); });
 
+        var rowGithubBackup = mc.querySelector('#dm-row-github-backup');
+        if (rowGithubBackup) rowGithubBackup.addEventListener('click', function () {
+            var dataModal = document.getElementById('data-modal');
+            if (dataModal && typeof hideModal === 'function') hideModal(dataModal);
+            if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
+                window.GitHubBackup.openModal();
+            }
+        });
+
         var fullDrawer = document.getElementById('dm-drawer-full');
         if (fullDrawer) {
             var backdrop1 = fullDrawer.querySelector('#dm-drawer-full-backdrop');
@@ -300,6 +320,15 @@
                     if (f && typeof importAllData === 'function') importAllData(f);
                 };
                 inp.click();
+            });
+            var githubBackupDrawerBtn = fullDrawer.querySelector('#github-backup-drawer-btn');
+            if (githubBackupDrawerBtn) githubBackupDrawerBtn.addEventListener('click', function () {
+                closeDrawer('dm-drawer-full');
+                var dataModal = document.getElementById('data-modal');
+                if (dataModal && typeof hideModal === 'function') hideModal(dataModal);
+                if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
+                    window.GitHubBackup.openModal();
+                }
             });
         }
 

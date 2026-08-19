@@ -1,0 +1,14 @@
+{
+  "name": "chuan-xun",
+  "version": "1.0.0",
+  "description": "传讯 - 梦角字卡与交流应用",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "echo 'Static app ready'",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -14,10 +14,29 @@ function setupEventListeners() {
         initThemeSchemes();
         
         initComboMenu(); 
-        
+        initGitHubBackupGlobalDelegation();
     } catch (e) {
         console.error("事件绑定过程中发生错误:", e);
     }
+}
+
+function initGitHubBackupGlobalDelegation() {
+    document.addEventListener('click', (e) => {
+        const ghTrigger = e.target.closest('#github-backup-settings, #github-backup-advanced-function, #dm-row-github-backup, #github-backup-drawer-btn, [data-action="github-backup"]');
+        if (ghTrigger) {
+            e.preventDefault();
+            e.stopPropagation();
+            ['settings-modal', 'advanced-modal', 'data-modal', 'chat-modal', 'appearance-modal'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && typeof hideModal === 'function') hideModal(el);
+            });
+            if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
+                window.GitHubBackup.openModal();
+            } else if (typeof window.openGitHubBackupModal === 'function') {
+                window.openGitHubBackupModal();
+            }
+        }
+    }, true);
 }
 
 function initChatActionListeners() {
@@ -507,6 +526,22 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
             if (_todoSettingsEl) _todoSettingsEl.addEventListener('click', () => {
                 hideModal(DOMElements.settingsModal.modal);
                 if (typeof window._openTodoModal === 'function') window._openTodoModal();
+            });
+
+            const _githubBackupSettingsEl = document.getElementById('github-backup-settings');
+            if (_githubBackupSettingsEl) _githubBackupSettingsEl.addEventListener('click', () => {
+                hideModal(DOMElements.settingsModal.modal);
+                if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
+                    window.GitHubBackup.openModal();
+                }
+            });
+
+            const _githubBackupAdvancedEl = document.getElementById('github-backup-advanced-function');
+            if (_githubBackupAdvancedEl) _githubBackupAdvancedEl.addEventListener('click', () => {
+                hideModal(DOMElements.advancedModal.modal);
+                if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
+                    window.GitHubBackup.openModal();
+                }
             });
 
             const _dataSettingsEl = document.getElementById('data-settings');

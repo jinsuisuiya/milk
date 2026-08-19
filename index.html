@@ -647,6 +647,10 @@
                     <i class="fas fa-check-circle"></i>
                     <span>待办清单</span>
                 </div>
+                <div class="settings-card" id="github-backup-settings">
+                    <i class="fab fa-github" style="color:var(--text-primary);"></i>
+                    <span>GitHub 备份</span>
+                </div>
             </div>
 
 
@@ -1406,6 +1410,9 @@
                     </div>
                     <div class="settings-item" id="anniversary-function">
                         <i class="fas fa-heart"></i><span>重要日</span>
+                    </div>
+                    <div class="settings-item" id="github-backup-advanced-function">
+                        <i class="fab fa-github"></i><span>GitHub 云端备份</span>
                     </div>
                 </div>
             </div>
@@ -2269,6 +2276,7 @@
     <script src="js/features/group-chat.js"></script>
     <script src="js/features/call.js"></script>
     <script src="js/features/todo.js"></script>
+    <script src="js/features/github-backup.js"></script>
 
     <!-- == 合并模块 == -->
     <script src="js/games.js"></script> 
@@ -2344,5 +2352,8 @@
         </div>
     </div>
 </div>
+
+<!-- ══ GitHub 云备份 Modal ══ -->
+<div class="modal" id="github-backup-modal" style="display:none;z-index:200000;"></div>
 </body>
 </html>

@@ -1,0 +1,6 @@
+{
+  "name": "传讯",
+  "description": "传讯 - 梦角字卡与交流应用",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
