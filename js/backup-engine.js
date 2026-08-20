@@ -201,12 +201,11 @@
         flags = flags || {};
         var p = [];
         if (!flags.inclStickers) p.push('stickerLibrary', 'myStickerLibrary');
-        if (!flags.inclThemes) p.push('backgroundGallery', 'chatBackground', 'partnerAvatar', 'myAvatar', 'playerCover');
+        if (!flags.inclThemes) p.push('backgroundGallery', 'chatBackground', 'playerCover', 'customThemes', 'themeSchemes');
         if (!flags.inclMsgs) p.push('chatMessages');
-        if (!flags.inclSet) p.push('chatSettings', 'partnerPersonas', 'showPartnerNameInChat');
+        if (!flags.inclSet) p.push('chatSettings', 'partnerPersonas', 'showPartnerNameInChat', 'partnerAvatar', 'myAvatar');
         if (!flags.inclCustom) p.push('customReplies', 'customPokes', 'customStatuses', 'customMottos', 'customIntros', 'customEmojis', 'customReplyGroups', 'customPokeGroups', 'customStatusGroups');
         if (!flags.inclAnn) p.push('anniversaries');
-        if (!flags.inclThemes) p.push('customThemes', 'themeSchemes');
         if (!flags.inclDg) p.push('dg_custom_data', 'dg_status_pool', 'weekly_fortune', 'daily_fortune', 'customWeather_');
         return p;
     }
@@ -372,8 +371,15 @@
 
         // 5. 尝试直接 JSON 解析
         try {
-            return JSON.parse(text);
+            var parsed = JSON.parse(text);
+            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0] && (parsed[0].sha || parsed[0].type || parsed[0].download_url)) {
+                throw new Error('检测到 GitHub 文件夹列表数据，请指定具体的备份文件路径（例如 backup/chatapp-backup.zip 或 .json）');
+            }
+            return parsed;
         } catch (jsonErr) {
+            if (jsonErr.message && jsonErr.message.indexOf('GitHub 文件夹') !== -1) {
+                throw jsonErr;
+            }
             // 6. 容错尝试：检查是否为 Base64 编码的 JSON
             if (/^[A-Za-z0-9+/=\s]+$/.test(text) && text.length > 20) {
                 try {
@@ -395,6 +401,45 @@
         return await loadBackupFromArrayBuffer(ab);
     }
 
+    async function buildZipArrayBuffer(payload) {
+        if (typeof JSZip === 'undefined') throw new Error('JSZip 未加载，请检查网络连接');
+        var zip = new JSZip();
+        var store = payload.mediaStore || {};
+        var mediaIndex = {};
+        for (var sid in store) {
+            if (!Object.prototype.hasOwnProperty.call(store, sid)) continue;
+            var url = store[sid];
+            var parts = dataUrlToBinary(url);
+            var path = 'media/' + sid;
+            if (parts && parts.bytes && parts.bytes.length) {
+                zip.file(path, parts.bytes, { binary: true });
+                mediaIndex[sid] = { path: path, mime: parts.mime };
+            } else {
+                var txtPath = path + '.txt';
+                zip.file(txtPath, String(url));
+                mediaIndex[sid] = { path: txtPath, mime: 'text/plain+dataurl' };
+            }
+        }
+        var jsonBody = {
+            type: 'chatapp-backup-v5',
+            formatVersion: 5,
+            appName: payload.appName || 'ChatApp',
+            timestamp: payload.timestamp,
+            sessionId: payload.sessionId,
+            appPrefix: payload.appPrefix,
+            modules: payload.modules,
+            localforage: payload.localforage,
+            localStorage: payload.localStorage,
+            mediaIndex: mediaIndex
+        };
+        zip.file('backup.json', '\uFEFF' + JSON.stringify(jsonBody));
+        return await zip.generateAsync({
+            type: 'arraybuffer',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 6 }
+        });
+    }
+
     async function exportBackupToFile(flags) {
         if (typeof showNotification === 'function') showNotification('正在打包备份（ZIP：结构与媒体分离）…', 'info', 4000);
         var payload = await buildBackupPayload(flags);
@@ -403,41 +448,8 @@
 
         if (typeof JSZip !== 'undefined') {
             try {
-                var zip = new JSZip();
-                var store = payload.mediaStore || {};
-                var mediaIndex = {};
-                for (var sid in store) {
-                    if (!Object.prototype.hasOwnProperty.call(store, sid)) continue;
-                    var url = store[sid];
-                    var parts = dataUrlToBinary(url);
-                    var path = 'media/' + sid;
-                    if (parts && parts.bytes && parts.bytes.length) {
-                        zip.file(path, parts.bytes, { binary: true });
-                        mediaIndex[sid] = { path: path, mime: parts.mime };
-                    } else {
-                        var txtPath = path + '.txt';
-                        zip.file(txtPath, String(url));
-                        mediaIndex[sid] = { path: txtPath, mime: 'text/plain+dataurl' };
-                    }
-                }
-                var jsonBody = {
-                    type: 'chatapp-backup-v5',
-                    formatVersion: 5,
-                    appName: payload.appName || 'ChatApp',
-                    timestamp: payload.timestamp,
-                    sessionId: payload.sessionId,
-                    appPrefix: payload.appPrefix,
-                    modules: payload.modules,
-                    localforage: payload.localforage,
-                    localStorage: payload.localStorage,
-                    mediaIndex: mediaIndex
-                };
-                zip.file('backup.json', '\uFEFF' + JSON.stringify(jsonBody));
-                var zipBlob = await zip.generateAsync({
-                    type: 'blob',
-                    compression: 'DEFLATE',
-                    compressionOptions: { level: 6 }
-                });
+                var zipAb = await buildZipArrayBuffer(payload);
+                var zipBlob = new Blob([zipAb], { type: 'application/zip' });
                 if (navigator.share && /Mobile|Android|iPhone|iPad/.test(navigator.userAgent)) {
                     try {
                         var shareFile = new File([zipBlob], fileNameZip, { type: 'application/zip' });
@@ -623,6 +635,7 @@
         extractMediaTree: extractMediaTree,
         inlineMediaTree: inlineMediaTree,
         buildBackupPayload: buildBackupPayload,
+        buildZipArrayBuffer: buildZipArrayBuffer,
         exportBackupToFile: exportBackupToFile,
         loadBackupFromFile: loadBackupFromFile,
         loadBackupFromArrayBuffer: loadBackupFromArrayBuffer,

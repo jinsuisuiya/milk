@@ -1,6 +1,7 @@
 /**
  * GitHub 云端备份与同步模块 (GitHub Cloud Backup & Restore Module)
  * 允许用户通过 GitHub Token、用户名、仓库名将传讯数据安全备份至 GitHub 私有/公开仓库，并支持一键恢复。
+ * 支持超大文件 (最高 100MB)、ZIP/JSON 自动压缩、文件夹自动扫描检索与多版本备份选择。
  */
 
 (function() {
@@ -8,12 +9,12 @@
 
     const CONFIG_KEY = 'chatapp_github_backup_config';
 
-    // 默认配置
+    // 默认配置（默认优先使用 .zip 格式，体积小 80-90% 且解析极度稳定）
     const DEFAULT_CONFIG = {
         owner: '',
         repo: '',
         token: '',
-        path: 'backup/chatapp-backup.json',
+        path: 'backup/chatapp-backup.zip',
         branch: 'main',
         lastBackupTime: null,
         lastBackupSha: null,
@@ -134,13 +135,15 @@
             };
         },
 
-        // 获取远端备份文件的元数据与 sha
-        async getRemoteFileInfo(cfgInput) {
+        // 获取远端路径信息（兼容单文件与文件夹）
+        async getRemoteFileInfo(cfgInput, specificPath) {
             const cfg = cfgInput || this.getConfig();
             const token = (cfg.token || '').trim();
             const owner = (cfg.owner || '').trim();
             const repo = (cfg.repo || '').trim();
-            const path = (cfg.path || 'backup/chatapp-backup.json').trim();
+            let path = (specificPath || cfg.path || 'backup/chatapp-backup.zip').trim();
+            // 去除首部的斜杠
+            path = path.replace(/^\/+/, '');
             const branch = (cfg.branch || 'main').trim();
 
             const headers = {
@@ -153,7 +156,7 @@
             const res = await fetch(url, { headers });
 
             if (res.status === 404) {
-                return { exists: false };
+                return { exists: false, isDir: false };
             }
             if (!res.ok) {
                 if (res.status === 401) throw new Error('Token 无效或已过期');
@@ -161,32 +164,186 @@
             }
 
             const data = await res.json();
+            if (Array.isArray(data)) {
+                return {
+                    exists: true,
+                    isDir: true,
+                    entries: data
+                };
+            }
+
             return {
                 exists: true,
+                isDir: false,
                 sha: data.sha,
                 size: data.size,
                 downloadUrl: data.download_url,
                 htmlUrl: data.html_url,
                 content: data.content,
-                encoding: data.encoding
+                encoding: data.encoding,
+                name: data.name,
+                path: data.path
             };
         },
 
-        // 上传备份至 GitHub (支持任意体量大文件：通过 Git Data Blobs API 或 Contents API)
+        // 列出仓库/目录中的所有备份文件（智能识别 .zip, .json, .gz 等备份文件）
+        async listRemoteBackups(cfgInput, specificFolder) {
+            const cfg = cfgInput || this.getConfig();
+            const token = (cfg.token || '').trim();
+            const owner = (cfg.owner || '').trim();
+            const repo = (cfg.repo || '').trim();
+            const branch = (cfg.branch || 'main').trim();
+
+            let folderPath = specificFolder !== undefined ? specificFolder : (cfg.path || 'backup/chatapp-backup.zip');
+            folderPath = folderPath.trim().replace(/^\/+/, '');
+            // 如果填的是具体文件，提取其所在目录
+            if (/\.[a-zA-Z0-9]+$/.test(folderPath)) {
+                const slashIdx = folderPath.lastIndexOf('/');
+                folderPath = slashIdx !== -1 ? folderPath.substring(0, slashIdx) : '';
+            } else {
+                folderPath = folderPath.replace(/\/+$/, '');
+            }
+
+            const headers = {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'ChatApp-Backup'
+            };
+
+            const tryFetchFolder = async (dir) => {
+                const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(dir)}?ref=${encodeURIComponent(branch)}`;
+                const res = await fetch(url, { headers });
+                if (!res.ok) return [];
+                const data = await res.json();
+                return Array.isArray(data) ? data : (data.name ? [data] : []);
+            };
+
+            let items = await tryFetchFolder(folderPath);
+            // 如果指定的文件夹为空且不是根目录，尝试扫描常见备选目录
+            if ((!items || items.length === 0) && folderPath !== '' && folderPath !== 'backup') {
+                const backupItems = await tryFetchFolder('backup');
+                if (backupItems.length > 0) items = backupItems;
+            }
+            if (!items || items.length === 0) {
+                const rootItems = await tryFetchFolder('');
+                if (rootItems.length > 0) items = rootItems;
+            }
+
+            // 筛选出所有备份文件候选（.zip, .json, .gz，或者名字包含 backup/chatapp）
+            const backupFiles = items.filter(item => {
+                if (item.type !== 'file') return false;
+                const name = (item.name || '').toLowerCase();
+                return name.endsWith('.zip') || name.endsWith('.json') || name.endsWith('.gz') || name.includes('backup');
+            }).map(item => ({
+                name: item.name,
+                path: item.path,
+                size: item.size || 0,
+                sha: item.sha,
+                downloadUrl: item.download_url,
+                htmlUrl: item.html_url
+            }));
+
+            // 排序：优先按名称中的时间戳或字母逆序排列（通常最新的在最前）
+            backupFiles.sort((a, b) => b.name.localeCompare(a.name));
+
+            return backupFiles;
+        },
+
+        // 从 GitHub 下载任意大文件二进制（支持高达 100MB 媒体大文件，通过 Git Blobs API 规避 1MB Contents 限制）
+        async downloadRemoteFileBinary(owner, repo, branch, filePath, token, knownSha) {
+            const headers = {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3.raw',
+                'User-Agent': 'ChatApp-Backup'
+            };
+
+            let sha = knownSha;
+
+            // 1. 如果没有传入 sha，先通过 contents API 获取文件元数据与 sha
+            if (!sha) {
+                const metaUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(filePath)}?ref=${encodeURIComponent(branch)}`;
+                const metaRes = await fetch(metaUrl, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'User-Agent': 'ChatApp-Backup'
+                    }
+                });
+
+                if (metaRes.status === 404) {
+                    throw new Error(`仓库中未找到文件: ${filePath}`);
+                }
+                if (!metaRes.ok) {
+                    if (metaRes.status === 401) throw new Error('Token 无效或已过期');
+                    throw new Error(`获取文件元数据失败 (${metaRes.status})`);
+                }
+
+                const meta = await metaRes.json();
+                if (Array.isArray(meta)) {
+                    throw new Error(`路径 "${filePath}" 是一个文件夹，请选择具体的备份文件`);
+                }
+                sha = meta.sha;
+
+                // 如果文件很小，直接内嵌了 base64 内容
+                if (meta.content && meta.encoding === 'base64') {
+                    return await this.base64ToArrayBuffer(meta.content);
+                }
+            }
+
+            // 2. 核心大文件拉取方案：利用 Git Data Blobs API (配合 raw header，支持百兆大文件且不产生内存膨胀)
+            if (sha) {
+                try {
+                    const blobUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${sha}`;
+                    const blobRes = await fetch(blobUrl, { headers });
+                    if (blobRes.ok) {
+                        const contentType = blobRes.headers.get('content-type') || '';
+                        // 如果 GitHub 返回了 JSON 格式的 Blob 包装 (某些代理或特殊版本)
+                        if (contentType.includes('application/json')) {
+                            const blobJson = await blobRes.json();
+                            if (blobJson.content && blobJson.encoding === 'base64') {
+                                return await this.base64ToArrayBuffer(blobJson.content);
+                            }
+                        } else {
+                            return await blobRes.arrayBuffer();
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[GitHubBackup] Git Blobs Raw 拉取异常，尝试回退接口:', e);
+                }
+            }
+
+            // 3. 回退方案：Contents Raw 流式下载
+            try {
+                const rawUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(filePath)}?ref=${encodeURIComponent(branch)}`;
+                const rawRes = await fetch(rawUrl, { headers });
+                if (rawRes.ok) {
+                    return await rawRes.arrayBuffer();
+                }
+            } catch (e2) {}
+
+            throw new Error(`无法从 GitHub 下载文件: ${filePath}`);
+        },
+
+        // 上传备份至 GitHub (支持任意体量大文件：通过 Git Data Blobs API 或 Contents API，自动采用 ZIP 压缩)
         async uploadBackup(options = {}) {
             const cfg = this.getConfig();
             const token = (cfg.token || '').trim();
             const owner = (cfg.owner || '').trim();
             const repo = (cfg.repo || '').trim();
-            const path = (cfg.path || 'backup/chatapp-backup.json').trim();
+            let path = (cfg.path || 'backup/chatapp-backup.zip').trim().replace(/^\/+/, '');
             const branch = (cfg.branch || 'main').trim();
 
             if (!owner || !repo || !token) {
                 throw new Error('请先在设置中填写 GitHub 用户名、仓库名和 Token');
             }
 
+            // 如果路径是一个目录名，自动补齐标准文件名
+            if (!/\.[a-zA-Z0-9]+$/.test(path)) {
+                path = path.replace(/\/+$/, '') + '/chatapp-backup.zip';
+            }
+
             // 1. 构建备份数据包
-            if (typeof ChatBackup === 'undefined' || !ChatBackup.buildBackupPayload || !ChatBackup.serializeBackupV4) {
+            if (typeof ChatBackup === 'undefined' || !ChatBackup.buildBackupPayload) {
                 throw new Error('备份引擎未就绪，请刷新页面后重试');
             }
 
@@ -207,14 +364,29 @@
                 device: navigator.userAgent
             };
 
-            const jsonStr = ChatBackup.serializeBackupV4(payload);
-            const rawBytes = new TextEncoder().encode(jsonStr);
-            const fileSize = rawBytes.byteLength;
+            let rawBuffer = null;
+            const isZipTarget = path.toLowerCase().endsWith('.zip') || (typeof JSZip !== 'undefined' && !path.toLowerCase().endsWith('.json'));
+
+            // 优先使用 ZIP 打包（体积减小 80%-90%，更省带宽，大文件夹极速同步）
+            if (isZipTarget && typeof JSZip !== 'undefined' && typeof ChatBackup.buildZipArrayBuffer === 'function') {
+                rawBuffer = await ChatBackup.buildZipArrayBuffer(payload);
+                if (!path.toLowerCase().endsWith('.zip') && !path.toLowerCase().endsWith('.json')) {
+                    path += '.zip';
+                }
+            } else {
+                const jsonStr = ChatBackup.serializeBackupV4 ? ChatBackup.serializeBackupV4(payload) : JSON.stringify(payload);
+                rawBuffer = new TextEncoder().encode(jsonStr).buffer;
+            }
+
+            const fileSize = rawBuffer.byteLength;
 
             // 2. 转换为高效 Base64
-            const base64Content = await this.arrayBufferToBase64(rawBytes.buffer);
+            const base64Content = await this.arrayBufferToBase64(rawBuffer);
 
-            const commitMessage = options.commitMessage || `Data Backup: ${new Date().toLocaleString()} (传讯数据备份 - ${(fileSize / 1024).toFixed(1)} KB)`;
+            const isZipFormat = isZipTarget && typeof JSZip !== 'undefined';
+            const formatTag = isZipFormat ? 'ZIP' : 'JSON';
+            const commitMessage = options.commitMessage || `Data Backup: ${new Date().toLocaleString()} (传讯${formatTag}备份 - ${(fileSize / 1024).toFixed(1)} KB)`;
+            
             const headers = {
                 'Authorization': `token ${token}`,
                 'Accept': 'application/vnd.github.v3+json',
@@ -226,18 +398,18 @@
             let newSha = null;
 
             // 3. 智能选择上传策略：
-            // 如果文件小于 1.5MB，尝试 Contents API（直观、单步）；如果大于 1.5MB 或 Contents API 报错，自动升迁为 Git Data API (Blobs -> Trees -> Commits)
-            let useGitDataApi = fileSize > 1500000;
+            // 如果文件小于 1MB，尝试 Contents API；如果大于 1MB 或 Contents API 报错，自动升迁为 Git Data API (Blobs -> Trees -> Commits)
+            let useGitDataApi = fileSize > 1000000;
 
             if (!useGitDataApi) {
                 try {
-                    const remoteInfo = await this.getRemoteFileInfo(cfg);
+                    const remoteInfo = await this.getRemoteFileInfo(cfg, path);
                     const body = {
                         message: commitMessage,
                         content: base64Content,
                         branch: branch
                     };
-                    if (remoteInfo.exists && remoteInfo.sha) {
+                    if (remoteInfo.exists && !remoteInfo.isDir && remoteInfo.sha) {
                         body.sha = remoteInfo.sha;
                     }
 
@@ -379,6 +551,7 @@
             // 5. 更新本地同步状态
             const nowTime = new Date().toISOString();
             this.saveConfig({
+                path: path,
                 lastBackupTime: nowTime,
                 lastBackupSha: newSha,
                 lastBackupUrl: commitUrl
@@ -389,81 +562,57 @@
                 time: nowTime,
                 sha: newSha,
                 url: commitUrl,
-                size: fileSize
+                size: fileSize,
+                path: path
             };
         },
 
-        // 从 GitHub 拉取备份文件 (支持任意体量大文件与多种压缩格式)
-        async fetchBackup() {
+        // 从 GitHub 拉取备份文件 (智能识别目录、多版本备份与超大文件)
+        async fetchBackup(specificFilePath) {
             const cfg = this.getConfig();
             const token = (cfg.token || '').trim();
             const owner = (cfg.owner || '').trim();
             const repo = (cfg.repo || '').trim();
-            const path = (cfg.path || 'backup/chatapp-backup.json').trim();
+            let targetPath = (specificFilePath || cfg.path || 'backup/chatapp-backup.zip').trim().replace(/^\/+/, '');
             const branch = (cfg.branch || 'main').trim();
 
             if (!owner || !repo || !token) {
                 throw new Error('请先在设置中填写 GitHub 用户名、仓库名和 Token');
             }
 
-            // 1. 优先使用 Raw 接口直接流式下载二进制（避免 1MB 截断、CORS 和 Base64 膨胀问题）
-            const rawUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(path)}?ref=${encodeURIComponent(branch)}`;
-            let ab = null;
+            let actualFilePath = targetPath;
+            let fileSha = null;
 
-            try {
-                const rawRes = await fetch(rawUrl, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3.raw',
-                        'User-Agent': 'ChatApp-Backup'
-                    }
-                });
-
-                if (rawRes.ok) {
-                    ab = await rawRes.arrayBuffer();
-                } else if (rawRes.status === 404) {
-                    throw new Error(`仓库中未找到备份文件: ${path} (分支: ${branch})`);
-                } else if (rawRes.status === 401) {
-                    throw new Error('GitHub Token 无效或已过期 (401 Unauthorized)');
+            // 1. 如果路径是目录或没有指定确切文件，先扫描该目录寻找备份文件
+            const isLikelyFolder = !/\.[a-zA-Z0-9]+$/.test(targetPath);
+            if (isLikelyFolder) {
+                const candidates = await this.listRemoteBackups(cfg, targetPath);
+                if (candidates && candidates.length > 0) {
+                    // 自动选取最新的一个备份文件
+                    actualFilePath = candidates[0].path;
+                    fileSha = candidates[0].sha;
+                } else {
+                    // 尝试默认标准路径
+                    actualFilePath = targetPath.replace(/\/+$/, '') + '/chatapp-backup.zip';
                 }
-            } catch (rawErr) {
-                if (rawErr.message.indexOf('未找到') !== -1 || rawErr.message.indexOf('401') !== -1) {
-                    throw rawErr;
-                }
-                console.warn('[GitHubBackup] Raw 模式拉取失败，尝试元数据解析:', rawErr);
             }
 
-            // 2. 回退机制：如果 Raw 接口未成功获取，则获取元数据
-            if (!ab || ab.byteLength === 0) {
-                const fileInfo = await this.getRemoteFileInfo(cfg);
-                if (!fileInfo.exists) {
-                    throw new Error(`仓库中未找到备份文件: ${path} (分支: ${branch})`);
-                }
-
-                if (fileInfo.sha) {
-                    // 通过 Git Blob API 获取
-                    const blobUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs/${fileInfo.sha}`;
-                    const blobRes = await fetch(blobUrl, {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3.raw',
-                            'User-Agent': 'ChatApp-Backup'
-                        }
-                    });
-                    if (blobRes.ok) {
-                        ab = await blobRes.arrayBuffer();
+            // 2. 下载二进制文件（支持大文件 Blob 流式拉取）
+            let ab = null;
+            try {
+                ab = await this.downloadRemoteFileBinary(owner, repo, branch, actualFilePath, token, fileSha);
+            } catch (err) {
+                // 如果是 zip 没找到，尝试查找同名或同目录的 json 备份文件
+                if (actualFilePath.endsWith('.zip')) {
+                    const fallbackJsonPath = actualFilePath.replace(/\.zip$/, '.json');
+                    try {
+                        ab = await this.downloadRemoteFileBinary(owner, repo, branch, fallbackJsonPath, token);
+                        actualFilePath = fallbackJsonPath;
+                    } catch (e2) {
+                        throw err;
                     }
-                }
-
-                if ((!ab || ab.byteLength === 0) && fileInfo.content && fileInfo.encoding === 'base64') {
-                    ab = await this.base64ToArrayBuffer(fileInfo.content);
-                }
-
-                if ((!ab || ab.byteLength === 0) && fileInfo.downloadUrl) {
-                    const dlRes = await fetch(fileInfo.downloadUrl, {
-                        headers: { 'Authorization': `token ${token}` }
-                    });
-                    if (dlRes.ok) ab = await dlRes.arrayBuffer();
+                } else {
+                    throw err;
                 }
             }
 
@@ -478,12 +627,13 @@
 
             const backupData = await ChatBackup.loadBackupFromArrayBuffer(ab);
             return {
+                filePath: actualFilePath,
                 fileInfo: { size: ab.byteLength },
                 backupData
             };
         },
 
-        // 恢复数据
+        // 恢复数据到本地存储
         async restoreBackup(backupData, options = {}) {
             if (typeof ChatBackup === 'undefined' || !ChatBackup.applyBackupToStorage) {
                 throw new Error('备份引擎未就绪');
@@ -552,8 +702,8 @@
                                 <i class="fab fa-github"></i>
                             </div>
                             <div>
-                                <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.2;">GitHub 云端备份</div>
-                                <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">将聊天记录与个性化设置托管至 GitHub 仓库</div>
+                                <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.2;">GitHub 云端备份与恢复</div>
+                                <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">将聊天记录与个性化设置托管至 GitHub 私有仓库</div>
                             </div>
                         </div>
                         <button id="gh-modal-close" type="button" style="width:32px;height:32px;border-radius:8px;border:none;background:rgba(var(--accent-color-rgb),0.1);color:var(--accent-color);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:0.2s;flex-shrink:0;">
@@ -605,7 +755,7 @@
                                     -
                                 </div>
                                 <div style="font-size:11.5px;color:var(--text-secondary);display:flex;flex-direction:column;gap:3px;">
-                                    <div><i class="far fa-file-code" style="width:14px;opacity:0.7"></i> 路径: <code id="gh-display-path" style="color:var(--text-primary)">backup/chatapp-backup.json</code> (<span id="gh-display-branch">main</span>)</div>
+                                    <div><i class="far fa-file-code" style="width:14px;opacity:0.7"></i> 路径: <code id="gh-display-path" style="color:var(--text-primary)">backup/chatapp-backup.zip</code> (<span id="gh-display-branch">main</span>)</div>
                                     <div><i class="far fa-clock" style="width:14px;opacity:0.7"></i> 上次备份: <span id="gh-last-time" style="color:var(--text-primary)">暂无记录</span></div>
                                 </div>
                             </div>
@@ -620,7 +770,7 @@
                                         <input type="checkbox" id="gh-opt-msgs" checked style="accent-color:var(--accent-color)"> 聊天记录
                                     </label>
                                     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
-                                        <input type="checkbox" id="gh-opt-set" checked style="accent-color:var(--accent-color)"> 外观与设置
+                                        <input type="checkbox" id="gh-opt-set" checked style="accent-color:var(--accent-color)"> 角色设置与头像
                                     </label>
                                     <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text-primary);">
                                         <input type="checkbox" id="gh-opt-custom" checked style="accent-color:var(--accent-color)"> 字卡与回复库
@@ -637,15 +787,35 @@
                                 </div>
                             </div>
 
-                            <!-- 备份与恢复按钮 -->
+                            <!-- 备份与恢复按钮组 -->
                             <div style="display:flex;flex-direction:column;gap:10px;">
                                 <button id="gh-upload-btn" type="button" style="width:100%;padding:13px;border:none;border-radius:14px;background:linear-gradient(135deg,#24292e,#1a1e22);color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(0,0,0,0.15);transition:transform 0.15s;">
-                                    <i class="fas fa-cloud-arrow-up"></i><span>立即备份至 GitHub</span>
+                                    <i class="fas fa-cloud-arrow-up"></i><span>立即备份至 GitHub (ZIP压缩)</span>
                                 </button>
 
-                                <button id="gh-restore-btn" type="button" style="width:100%;padding:12px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--primary-bg);color:var(--text-primary);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.15s;">
-                                    <i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i><span>从 GitHub 恢复数据</span>
-                                </button>
+                                <div style="display:flex;gap:8px;">
+                                    <button id="gh-restore-btn" type="button" style="flex:1;padding:12px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--primary-bg);color:var(--text-primary);font-size:13.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background 0.15s;">
+                                        <i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i><span>快速恢复数据</span>
+                                    </button>
+                                    <button id="gh-browse-btn" type="button" title="浏览仓库目录下的全部备份版本" style="padding:12px 14px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--primary-bg);color:var(--text-secondary);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;">
+                                        <i class="fas fa-folder-open"></i><span>备份版本库</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 仓库备份列表浏览器 (折叠卡片) -->
+                            <div id="gh-file-browser-box" style="display:none;background:var(--primary-bg);border:1px solid var(--border-color);border-radius:16px;padding:12px 14px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                                    <div style="font-size:12px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:6px;">
+                                        <i class="fas fa-list-ul" style="color:var(--accent-color);"></i>仓库备份文件列表
+                                    </div>
+                                    <button id="gh-refresh-list-btn" type="button" style="background:none;border:none;color:var(--accent-color);font-size:11.5px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                                        <i class="fas fa-rotate"></i>刷新
+                                    </button>
+                                </div>
+                                <div id="gh-file-list-container" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;font-size:12px;">
+                                    <div style="color:var(--text-secondary);text-align:center;padding:12px 0;">点击刷新检索仓库文件...</div>
+                                </div>
                             </div>
 
                             <!-- 操作状态提示 -->
@@ -668,7 +838,7 @@
                                 </label>
                                 <input id="gh-input-repo" type="text" placeholder="例如: my-chatapp-backup"
                                     style="width:100%;padding:10px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:13px;outline:none;box-sizing:border-box;">
-                                <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">建议在 GitHub 创建 Private（私有）仓库以保护个人隐私</div>
+                                <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">建议在 GitHub 创建 <strong>Private（私有）</strong> 仓库以保护个人隐私</div>
                             </div>
 
                             <div>
@@ -695,8 +865,9 @@
                                     <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
                                         保存文件路径
                                     </label>
-                                    <input id="gh-input-path" type="text" placeholder="backup/chatapp-backup.json"
+                                    <input id="gh-input-path" type="text" placeholder="backup/chatapp-backup.zip"
                                         style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color);border-radius:12px;background:var(--primary-bg);color:var(--text-primary);font-size:12.5px;outline:none;box-sizing:border-box;font-family:monospace;">
+                                    <div style="font-size:10.5px;color:var(--text-secondary);margin-top:3px;">支持填具体文件 (.zip/.json) 或文件夹 (例如 backup/)</div>
                                 </div>
                                 <div>
                                     <label style="display:block;font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:6px;">
@@ -748,7 +919,7 @@
             if (ownerInput) ownerInput.value = cfg.owner || '';
             if (repoInput) repoInput.value = cfg.repo || '';
             if (tokenInput) tokenInput.value = cfg.token || '';
-            if (pathInput) pathInput.value = cfg.path || 'backup/chatapp-backup.json';
+            if (pathInput) pathInput.value = cfg.path || 'backup/chatapp-backup.zip';
             if (branchInput) branchInput.value = cfg.branch || 'main';
 
             // 更新配置与未配置卡片
@@ -763,7 +934,7 @@
                 if (unconfiguredCard) unconfiguredCard.style.display = 'none';
                 if (configuredCard) configuredCard.style.display = 'block';
                 if (displayRepo) displayRepo.textContent = `${cfg.owner}/${cfg.repo}`;
-                if (displayPath) displayPath.textContent = cfg.path || 'backup/chatapp-backup.json';
+                if (displayPath) displayPath.textContent = cfg.path || 'backup/chatapp-backup.zip';
                 if (displayBranch) displayBranch.textContent = cfg.branch || 'main';
                 if (lastTime) {
                     lastTime.textContent = cfg.lastBackupTime ? new Date(cfg.lastBackupTime).toLocaleString() : '暂无记录';
@@ -805,6 +976,96 @@
             }
         },
 
+        async renderBackupList(modal) {
+            const container = modal.querySelector('#gh-file-list-container');
+            if (!container) return;
+
+            container.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:12px 0;"><i class="fas fa-spinner fa-spin"></i> 正在检索仓库中的备份文件...</div>';
+
+            try {
+                const files = await this.listRemoteBackups();
+                if (!files || files.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary);text-align:center;padding:12px 0;">仓库或目标文件夹中暂未发现 .zip / .json 备份文件</div>';
+                    return;
+                }
+
+                let html = '';
+                files.forEach(f => {
+                    const sizeStr = f.size > 1048576 
+                        ? (f.size / 1048576).toFixed(1) + ' MB' 
+                        : (f.size / 1024).toFixed(0) + ' KB';
+                    const isZip = f.name.endsWith('.zip');
+                    const iconClass = isZip ? 'fa-file-zipper' : 'fa-file-code';
+
+                    html += `
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--secondary-bg);border:1px solid var(--border-color);border-radius:10px;gap:8px;">
+                            <div style="display:flex;align-items:center;gap:8px;overflow:hidden;flex:1;">
+                                <i class="fas ${iconClass}" style="color:var(--accent-color);font-size:14px;flex-shrink:0;"></i>
+                                <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                    <div style="font-weight:600;color:var(--text-primary);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this.escapeHtml(f.name)}</div>
+                                    <div style="font-size:10.5px;color:var(--text-secondary);">${this.escapeHtml(f.path)} · ${sizeStr}</div>
+                                </div>
+                            </div>
+                            <button type="button" class="gh-restore-specific-btn" data-path="${this.escapeHtml(f.path)}" style="padding:4px 10px;border:none;border-radius:8px;background:var(--accent-color);color:#fff;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                                恢复此文件
+                            </button>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+
+                // 绑定单文件恢复事件
+                container.querySelectorAll('.gh-restore-specific-btn').forEach(btn => {
+                    btn.onclick = async () => {
+                        const targetPath = btn.getAttribute('data-path');
+                        if (!targetPath) return;
+                        await this.triggerRestore(modal, targetPath);
+                    };
+                });
+
+            } catch (err) {
+                container.innerHTML = `<div style="color:#D03030;text-align:center;padding:12px 0;">检索失败: ${this.escapeHtml(err.message)}</div>`;
+            }
+        },
+
+        async triggerRestore(modal, specificFilePath) {
+            const restoreBtn = modal.querySelector('#gh-restore-btn');
+            const actionStatus = modal.querySelector('#gh-action-status');
+
+            if (restoreBtn) restoreBtn.disabled = true;
+            this.showStatus(actionStatus, '<i class="fas fa-spinner fa-spin"></i> 正在从 GitHub 下载并解析备份数据...', 'info');
+
+            try {
+                const { filePath, fileInfo, backupData } = await this.fetchBackup(specificFilePath);
+                const dateStr = backupData.exportDate || backupData.timestamp || backupData.githubBackupMeta?.syncedAt || '未知时间';
+                const msgsCount = (backupData.messages && backupData.messages.length) || (backupData.indexedDB?.chatMessages?.length) || 0;
+                const sizeKb = fileInfo && fileInfo.size ? (fileInfo.size / 1024).toFixed(0) + ' KB' : '';
+
+                const confirmMsg = `已从 GitHub 获取到备份文件：\n- 文件路径: ${filePath} (${sizeKb})\n- 备份时间: ${dateStr}\n- 包含消息: ${msgsCount} 条\n\n确定要恢复此备份并覆盖当前数据吗？`;
+                if (!confirm(confirmMsg)) {
+                    this.showStatus(actionStatus, '已取消恢复操作', 'info');
+                    if (restoreBtn) restoreBtn.disabled = false;
+                    return;
+                }
+
+                this.showStatus(actionStatus, '<i class="fas fa-spinner fa-spin"></i> 正在恢复本地存储与个性化数据...', 'info');
+                await this.restoreBackup(backupData);
+
+                this.showStatus(actionStatus, '✓ 数据恢复成功！页面即将刷新以应用最新数据...', 'success');
+                if (typeof showNotification === 'function') showNotification('数据恢复成功，页面即将刷新', 'success');
+
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } catch (err) {
+                console.error('[GitHubBackup] 恢复失败:', err);
+                this.showStatus(actionStatus, `✕ 恢复失败: ${err.message}`, 'error');
+            } finally {
+                if (restoreBtn) restoreBtn.disabled = false;
+            }
+        },
+
         bindEvents(modal) {
             // 背景点击关闭
             modal.onclick = (e) => {
@@ -836,6 +1097,24 @@
                     tokenInput.type = isPass ? 'text' : 'password';
                     toggleTokenBtn.innerHTML = isPass ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
                 };
+            }
+
+            // 浏览备份文件列表折叠开关
+            const browseBtn = modal.querySelector('#gh-browse-btn');
+            const fileBrowserBox = modal.querySelector('#gh-file-browser-box');
+            if (browseBtn && fileBrowserBox) {
+                browseBtn.onclick = () => {
+                    const isHidden = fileBrowserBox.style.display === 'none';
+                    fileBrowserBox.style.display = isHidden ? 'block' : 'none';
+                    if (isHidden) {
+                        this.renderBackupList(modal);
+                    }
+                };
+            }
+
+            const refreshListBtn = modal.querySelector('#gh-refresh-list-btn');
+            if (refreshListBtn) {
+                refreshListBtn.onclick = () => this.renderBackupList(modal);
             }
 
             // 测试连接按钮
@@ -875,7 +1154,7 @@
                     const owner = modal.querySelector('#gh-input-owner')?.value.trim();
                     const repo = modal.querySelector('#gh-input-repo')?.value.trim();
                     const token = modal.querySelector('#gh-input-token')?.value.trim();
-                    const path = modal.querySelector('#gh-input-path')?.value.trim() || 'backup/chatapp-backup.json';
+                    const path = modal.querySelector('#gh-input-path')?.value.trim() || 'backup/chatapp-backup.zip';
                     const branch = modal.querySelector('#gh-input-branch')?.value.trim() || 'main';
 
                     if (!owner || !repo || !token) {
@@ -914,64 +1193,39 @@
 
                     uploadBtn.disabled = true;
                     uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>正在打包并上传...</span>';
-                    this.showStatus(actionStatus, '正在构建备份数据并上传至 GitHub...', 'info');
+                    this.showStatus(actionStatus, '正在压缩备份数据并上传至 GitHub 仓库...', 'info');
 
                     try {
                         const res = await this.uploadBackup({
                             inclMsgs, inclSet, inclCustom, inclAnn, inclThemes, inclDg
                         });
                         const sizeKb = (res.size / 1024).toFixed(1);
-                        this.showStatus(actionStatus, `✓ 备份成功！文件大小: ${sizeKb} KB<br><a href="${res.url}" target="_blank" style="color:var(--accent-color);text-decoration:underline;">在 GitHub 上查看提交</a>`, 'success');
+                        this.showStatus(actionStatus, `✓ 备份成功！文件: ${this.escapeHtml(res.path)} (${sizeKb} KB)<br><a href="${res.url}" target="_blank" style="color:var(--accent-color);text-decoration:underline;">在 GitHub 上查看提交</a>`, 'success');
                         
                         const timeEl = modal.querySelector('#gh-last-time');
                         if (timeEl) timeEl.textContent = new Date(res.time).toLocaleString();
 
                         if (typeof showNotification === 'function') showNotification('已成功备份到 GitHub', 'success');
+                        
+                        // 如果列表展开，自动刷新列表
+                        if (fileBrowserBox && fileBrowserBox.style.display !== 'none') {
+                            this.renderBackupList(modal);
+                        }
                     } catch (err) {
                         console.error('[GitHubBackup] 上传失败:', err);
                         this.showStatus(actionStatus, `✕ 上传失败: ${err.message}`, 'error');
                     } finally {
                         uploadBtn.disabled = false;
-                        uploadBtn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i><span>立即备份至 GitHub</span>';
+                        uploadBtn.innerHTML = '<i class="fas fa-cloud-arrow-up"></i><span>立即备份至 GitHub (ZIP压缩)</span>';
                     }
                 };
             }
 
-            // 从 GitHub 恢复按钮
+            // 从 GitHub 恢复按钮（默认恢复最新备份）
             const restoreBtn = modal.querySelector('#gh-restore-btn');
             if (restoreBtn) {
                 restoreBtn.onclick = async () => {
-                    restoreBtn.disabled = true;
-                    restoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>正在获取备份...</span>';
-                    this.showStatus(actionStatus, '正在从 GitHub 下载并解析备份文件...', 'info');
-
-                    try {
-                        const { fileInfo, backupData } = await this.fetchBackup();
-                        const dateStr = backupData.exportDate || backupData.timestamp || backupData.githubBackupMeta?.syncedAt || '未知时间';
-                        const msgsCount = (backupData.messages && backupData.messages.length) || 0;
-
-                        const confirmMsg = `已从 GitHub 获取到备份文件！\n\n- 备份时间: ${dateStr}\n- 包含消息: ${msgsCount} 条\n\n确定要恢复此备份并覆盖当前数据吗？`;
-                        if (!confirm(confirmMsg)) {
-                            this.showStatus(actionStatus, '已取消恢复操作', 'info');
-                            return;
-                        }
-
-                        this.showStatus(actionStatus, '正在恢复本地数据...', 'info');
-                        await this.restoreBackup(backupData);
-
-                        this.showStatus(actionStatus, '✓ 数据恢复成功！页面即将刷新以应用最新数据...', 'success');
-                        if (typeof showNotification === 'function') showNotification('数据恢复成功，即将刷新', 'success');
-
-                        setTimeout(() => {
-                            location.reload();
-                        }, 1500);
-                    } catch (err) {
-                        console.error('[GitHubBackup] 恢复失败:', err);
-                        this.showStatus(actionStatus, `✕ 恢复失败: ${err.message}`, 'error');
-                    } finally {
-                        restoreBtn.disabled = false;
-                        restoreBtn.innerHTML = '<i class="fas fa-cloud-arrow-down" style="color:var(--accent-color)"></i><span>从 GitHub 恢复数据</span>';
-                    }
+                    await this.triggerRestore(modal);
                 };
             }
         },

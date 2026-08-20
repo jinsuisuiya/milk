@@ -513,6 +513,13 @@ const _BACKUP_PREFIX = 'BACKUP_V1_';
 function _backupCriticalData() {
     if (window._skipBackup) return;
     try {
+        if (typeof DOMElements !== 'undefined' && DOMElements.partner && DOMElements.partner.name && !settings.partnerName) {
+            settings.partnerName = DOMElements.partner.name.textContent;
+        }
+        if (typeof DOMElements !== 'undefined' && DOMElements.me && DOMElements.me.name && !settings.myName) {
+            settings.myName = DOMElements.me.name.textContent;
+        }
+
         const backupPayload = {
             ts: Date.now(),
             messages: messages,
@@ -2156,7 +2163,28 @@ function showModal(modalElement, focusElement = null) {
                         exportObj.exportModules.push('messages');
                     }
                     if (inclSettings) {
-                        exportObj.settings = settings;
+                        const currentPartnerAvatar = (() => {
+                            const img = DOMElements && DOMElements.partner && DOMElements.partner.avatar ? DOMElements.partner.avatar.querySelector('img') : null;
+                            return (img && img.src && !img.src.startsWith('data:image/svg')) ? img.src : (settings.partnerAvatar || null);
+                        })();
+                        const currentMyAvatar = (() => {
+                            const img = DOMElements && DOMElements.me && DOMElements.me.avatar ? DOMElements.me.avatar.querySelector('img') : null;
+                            return (img && img.src && !img.src.startsWith('data:image/svg')) ? img.src : (settings.myAvatar || null);
+                        })();
+
+                        exportObj.settings = Object.assign({}, settings);
+                        exportObj.settings.partnerName = settings.partnerName || (DOMElements && DOMElements.partner && DOMElements.partner.name ? DOMElements.partner.name.textContent : '梦角');
+                        exportObj.settings.myName = settings.myName || (DOMElements && DOMElements.me && DOMElements.me.name ? DOMElements.me.name.textContent : '我');
+                        
+                        if (currentPartnerAvatar) {
+                            exportObj.partnerAvatar = currentPartnerAvatar;
+                            exportObj.settings.partnerAvatar = currentPartnerAvatar;
+                        }
+                        if (currentMyAvatar) {
+                            exportObj.myAvatar = currentMyAvatar;
+                            exportObj.settings.myAvatar = currentMyAvatar;
+                        }
+
                         exportObj.exportModules.push('settings');
                         exportObj.dgCustomData = dgCustomData;
                         exportObj.dgStatusPool = dgStatusPool;
@@ -2375,6 +2403,32 @@ function showModal(modalElement, focusElement = null) {
                             if (importedData.dgCustomData) { try { localStorage.setItem('dg_custom_data', JSON.stringify(importedData.dgCustomData)); } catch(e2) {} }
                             if (importedData.dgStatusPool) { try { localStorage.setItem('dg_status_pool', JSON.stringify(importedData.dgStatusPool)); } catch(e2) {} }
                             if (importedData.customWeatherMap) { try { Object.keys(importedData.customWeatherMap).forEach(wk => localStorage.setItem(wk, importedData.customWeatherMap[wk])); } catch(e2) {} }
+
+                            // 恢复并同步对方与自己的名字到界面
+                            if (settings.partnerName && DOMElements && DOMElements.partner && DOMElements.partner.name) {
+                                DOMElements.partner.name.textContent = settings.partnerName;
+                            }
+                            if (settings.myName && DOMElements && DOMElements.me && DOMElements.me.name) {
+                                DOMElements.me.name.textContent = settings.myName;
+                            }
+
+                            // 恢复并持久化对方与自己的头像
+                            const pAvatar = importedData.partnerAvatar || (importedData.settings && importedData.settings.partnerAvatar);
+                            const mAvatar = importedData.myAvatar || (importedData.settings && importedData.settings.myAvatar);
+                            if (pAvatar) {
+                                settings.partnerAvatar = pAvatar;
+                                try { localforage.setItem(getStorageKey('partnerAvatar'), pAvatar); } catch(e2) {}
+                                if (DOMElements && DOMElements.partner && DOMElements.partner.avatar) {
+                                    updateAvatar(DOMElements.partner.avatar, pAvatar);
+                                }
+                            }
+                            if (mAvatar) {
+                                settings.myAvatar = mAvatar;
+                                try { localforage.setItem(getStorageKey('myAvatar'), mAvatar); } catch(e2) {}
+                                if (DOMElements && DOMElements.me && DOMElements.me.avatar) {
+                                    updateAvatar(DOMElements.me.avatar, mAvatar);
+                                }
+                            }
                         }
                         if (doReplies  && importedData.customReplies)  customReplies  = importedData.customReplies;
                         if (doReplies  && importedData.customEmojis && Array.isArray(importedData.customEmojis)) customEmojis = importedData.customEmojis;

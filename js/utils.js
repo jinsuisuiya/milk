@@ -432,8 +432,8 @@ async function importAllData(file) {
         const categories = [
             {
                 id: 'chat',
-                label: '聊天记录 / 会话 / 红包',
-                indexedDBNeedles: ['chatMessages', 'sessionList', 'chatSettings', 'showPartnerNameInChat', 'envelopeData', 'pending_envelope'],
+                label: '聊天记录 / 会话 / 角色设置与头像',
+                indexedDBNeedles: ['chatMessages', 'sessionList', 'chatSettings', 'showPartnerNameInChat', 'envelopeData', 'pending_envelope', 'partnerAvatar', 'myAvatar'],
                 localStorageNeedles: ['groupChatSettings']
             },
             {

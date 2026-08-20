@@ -318,22 +318,25 @@
                 max-width: 230px;
                 min-width: 80px;
                 padding: 9px 13px;
-                background: rgba(var(--secondary-bg-rgb, 255, 255, 255), 0.97);
+                background: var(--secondary-bg, #ffffff);
                 color: var(--text-primary, #333);
                 border: 1px solid var(--border-color, rgba(0,0,0,0.12));
                 border-radius: 16px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 3px 8px rgba(0, 0, 0, 0.08);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.06);
                 font-size: 13px;
                 line-height: 1.45;
                 letter-spacing: 0.2px;
                 backdrop-filter: blur(16px);
                 -webkit-backdrop-filter: blur(16px);
-                pointer-events: auto;
+                pointer-events: none;
+                visibility: hidden;
                 opacity: 0;
                 transform: translateY(8px) scale(0.92);
-                transition: opacity 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+                transition: opacity 0.22s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2), visibility 0.22s;
                 word-break: break-word;
                 text-align: left;
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
             `;
 
             // 气泡下箭头
@@ -346,7 +349,7 @@
                 transform: translateX(-50%) rotate(45deg);
                 width: 11px;
                 height: 11px;
-                background: inherit;
+                background: var(--secondary-bg, #ffffff);
                 border-right: 1px solid var(--border-color, rgba(0,0,0,0.12));
                 border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.12));
             `;
@@ -358,7 +361,7 @@
             textSpan.style.cssText = 'position: relative; z-index: 1; font-weight: 500;';
             bubble.appendChild(textSpan);
 
-            // 桌宠头像外框容器
+            // 桌宠头像外框容器 (无白底、无白罩、透明背景)
             const avatarWrap = document.createElement('div');
             avatarWrap.id = 'floating-pet-avatar-wrap';
             avatarWrap.className = 'floating-pet-avatar-wrap';
@@ -370,15 +373,19 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: var(--primary-bg, #fff);
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.1);
+                background: transparent;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
                 border: 2.5px solid var(--accent-color, #FF6B8B);
                 overflow: visible;
                 cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+                user-select: none;
+                -webkit-user-select: none;
                 transition: transform 0.16s cubic-bezier(0.3, 1.4, 0.5, 1);
             `;
 
-            // 头像图像 (展示对方头像或自定义图片)
+            // 头像图像 (展示对方头像或自定义图片，透明底)
             const avatarImg = document.createElement('img');
             avatarImg.className = 'floating-pet-avatar-img';
             avatarImg.style.cssText = `
@@ -387,6 +394,9 @@
                 border-radius: 50%;
                 object-fit: cover;
                 pointer-events: none;
+                background: transparent;
+                display: block;
+                -webkit-tap-highlight-color: transparent;
             `;
             avatarWrap.appendChild(avatarImg);
 
@@ -504,11 +514,6 @@
                 origLeft = rect.left;
                 origTop = rect.top;
 
-                // 长按 500ms 唤起桌宠与保活设置面板
-                longPressTimer = setTimeout(() => {
-                    if (!isMoved) this.openConfigModal();
-                }, 500);
-
                 window.addEventListener('pointermove', onPointerMove, { passive: false });
                 window.addEventListener('pointerup', onPointerUp);
                 window.addEventListener('pointercancel', onPointerUp);
@@ -524,7 +529,6 @@
 
                 if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
                     isMoved = true;
-                    if (longPressTimer) clearTimeout(longPressTimer);
                 }
 
                 let newLeft = origLeft + dx;
@@ -547,7 +551,6 @@
             };
 
             const onPointerUp = () => {
-                if (longPressTimer) clearTimeout(longPressTimer);
                 if (!this.isDragging) return;
                 this.isDragging = false;
                 el.style.cursor = 'grab';
@@ -670,6 +673,7 @@
                 }
             }
 
+            this.bubbleEl.style.visibility = 'visible';
             this.bubbleEl.style.opacity = '1';
             this.bubbleEl.style.transform = 'translateY(0) scale(1)';
 
@@ -690,6 +694,11 @@
             if (!this.bubbleEl) return;
             this.bubbleEl.style.opacity = '0';
             this.bubbleEl.style.transform = 'translateY(8px) scale(0.92)';
+            setTimeout(() => {
+                if (this.bubbleEl && this.bubbleEl.style.opacity === '0') {
+                    this.bubbleEl.style.visibility = 'hidden';
+                }
+            }, 230);
 
             if (this.pipWindow && this.pipBubbleEl) {
                 this.pipBubbleEl.style.opacity = '0.3';
