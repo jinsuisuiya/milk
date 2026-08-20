@@ -1,34 +1,38 @@
-const CACHE_NAME = 'chuanxun-cache-v3';
+const CACHE_NAME = 'chuanxun-cache-v4';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
-  './js/app.js',
-  './js/backup-engine.js',
   './js/config.js',
+  './js/utils.js',
+  './js/backup-engine.js',
+  './js/state.js',
   './js/core.js',
-  './js/data.js',
-  './js/features.js',
-  './js/features/call.js',
-  './js/features/envelope.js',
-  './js/features/group-chat.js',
   './js/features/mood.js',
+  './js/features/envelope.js',
   './js/features/reply-library.js',
   './js/features/theme-editor.js',
+  './js/features/group-chat.js',
+  './js/features/call.js',
+  './js/features/todo.js',
+  './js/features/github-backup.js',
+  './js/features/floating-pet.js',
   './js/games.js',
-  './js/listeners.js',
+  './js/features.js',
+  './js/data.js',
   './js/onboarding.js',
-  './js/state.js',
-  './js/utils.js',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './js/listeners.js',
+  './js/app.js',
+  './icons/apple-touch-icon.png',
+  './icons/icon-192.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cache.addAll(APP_SHELL.map(url => new Request(url, { cache: 'reload' }))))
+      .catch((err) => console.warn('PWA Cache install skipped missing assets:', err))
       .then(() => self.skipWaiting())
   );
 });
@@ -50,7 +54,9 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, res.clone()));
+          if (res && res.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, res.clone()));
+          }
           return res;
         })
         .catch(() => caches.match(request).then((r) => r || caches.match('./index.html')))
@@ -62,11 +68,13 @@ self.addEventListener('fetch', (event) => {
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((res) => {
-        if (res && res.status === 200 && res.type === 'basic') {
+        if (res && res.status === 200 && (res.type === 'basic' || res.type === 'cors')) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return res;
+      }).catch((err) => {
+        console.warn('Fetch fallback:', err);
       });
     })
   );

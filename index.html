@@ -26,6 +26,14 @@
     <style id="css-live-preview-style"></style>
 </head>
 <body>
+<script>
+    // 立即检测：若已签署入场承诺，直接隐藏声明层，避免二次重绘闪烁
+    try {
+        if (localStorage.getItem('splashPledgeSigned_v3') === 'true') {
+            document.write('<style>#splash-declaration{display:none !important;}</style>');
+        }
+    } catch(e) {}
+</script>
 <div id="splash-declaration">
     <div class="splash-bg-stars" id="splash-stars"></div>
     <div class="splash-glow-1"></div>
@@ -163,10 +171,10 @@
 
             <div class="text-tech-container">
                 <div class="welcome-title-glitch" id="welcome-title-glitch" data-text="传讯">
-                    加载失败
+                    传讯
                 </div>
                 <div class="welcome-subtitle-scramble" id="welcome-subtitle-scramble">
-                    请重试／更换平台/更换网络
+                    正在载入专属空间...
                 </div>
             </div>
 
@@ -176,6 +184,22 @@
             <div id="loader-status-text" style="font-size:10px;opacity:0.5;letter-spacing:1px;color:var(--welcome-text-sub);margin-top:4px;font-family:monospace;"></div>
         </div>
     </div>
+    <script>
+        // 白屏防御：安全守护计时器，确保开屏动画在任何情况下都能准时退出，绝不卡死或黑白屏
+        (function() {
+            function forceDismissWelcome() {
+                var w = document.getElementById('welcome-animation');
+                if (w && !w.classList.contains('hidden')) {
+                    w.classList.add('hidden');
+                    setTimeout(function() { w.style.display = 'none'; }, 800);
+                }
+            }
+            setTimeout(forceDismissWelcome, 4200);
+            window.addEventListener('load', function() {
+                setTimeout(forceDismissWelcome, 3200);
+            }, { once: true });
+        })();
+    </script>
     <button id="immersive-exit-btn" onclick="toggleImmersiveMode(false)" title="退出沉浸模式">
 <i class="fas fa-expand"></i>
 </button>
@@ -2264,40 +2288,6 @@
 </div>
 
 <div id="dg-editor-modal" style="display:none;"></div>
-    <!-- == 核心层 == -->
-    <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/backup-engine.js"></script>
-    <script src="js/state.js"></script>
-    <script src="js/core.js"></script>
-
-    <!-- == 功能模块 == -->
-    <script src="js/features/mood.js"></script>
-    <script src="js/features/envelope.js"></script>
-    <script src="js/features/reply-library.js"></script>
-    <script src="js/features/theme-editor.js"></script>
-    <script src="js/features/group-chat.js"></script>
-    <script src="js/features/call.js"></script>
-    <script src="js/features/todo.js"></script>
-    <script src="js/features/github-backup.js"></script>
-    <script src="js/features/floating-pet.js"></script>
-
-    <!-- == 合并模块 == -->
-    <script src="js/games.js"></script> 
-    <script src="js/features.js"></script> 
-    <script src="js/data.js"></script>
-    <script src="js/onboarding.js"></script> 
-    <script src="js/listeners.js"></script>
-    <script src="js/app.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(err => {
-                    console.warn('Service worker registration failed:', err);
-                });
-            });
-        }
-    </script>
 
 <!-- ══ 待办清单 Modal ══ -->
 <div class="modal" id="todo-modal">
@@ -2359,5 +2349,40 @@
 
 <!-- ══ GitHub 云备份 Modal ══ -->
 <div class="modal" id="github-backup-modal" style="display:none;z-index:200000;"></div>
+
+    <!-- == 核心层 == -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/backup-engine.js"></script>
+    <script src="js/state.js"></script>
+    <script src="js/core.js"></script>
+
+    <!-- == 功能模块 == -->
+    <script src="js/features/mood.js"></script>
+    <script src="js/features/envelope.js"></script>
+    <script src="js/features/reply-library.js"></script>
+    <script src="js/features/theme-editor.js"></script>
+    <script src="js/features/group-chat.js"></script>
+    <script src="js/features/call.js"></script>
+    <script src="js/features/todo.js"></script>
+    <script src="js/features/github-backup.js"></script>
+    <script src="js/features/floating-pet.js"></script>
+
+    <!-- == 合并模块 == -->
+    <script src="js/games.js"></script> 
+    <script src="js/features.js"></script> 
+    <script src="js/data.js"></script>
+    <script src="js/onboarding.js"></script> 
+    <script src="js/listeners.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => {
+                    console.warn('Service worker registration failed:', err);
+                });
+            });
+        }
+    </script>
 </body>
 </html>
