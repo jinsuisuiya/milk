@@ -186,7 +186,7 @@
             };
         },
 
-        // 列出仓库/目录中的所有备份文件（智能识别 .zip, .json, .gz 等备份文件）
+        // 列出仓库/目录中的所有备份文件（智能识别 .zip, .json, .gz 等备份文件，支持递归整库检索）
         async listRemoteBackups(cfgInput, specificFolder) {
             const cfg = cfgInput || this.getConfig();
             const token = (cfg.token || '').trim();
@@ -196,7 +196,6 @@
 
             let folderPath = specificFolder !== undefined ? specificFolder : (cfg.path || 'backup/chatapp-backup.zip');
             folderPath = folderPath.trim().replace(/^\/+/, '');
-            // 如果填的是具体文件，提取其所在目录
             if (/\.[a-zA-Z0-9]+$/.test(folderPath)) {
                 const slashIdx = folderPath.lastIndexOf('/');
                 folderPath = slashIdx !== -1 ? folderPath.substring(0, slashIdx) : '';
@@ -210,6 +209,56 @@
                 'User-Agent': 'ChatApp-Backup'
             };
 
+            const backupCandidates = [];
+
+            // 1. 首选方案：Git Trees API 递归整库检索（单次请求秒级解析全部文件与子文件夹，无视目录体量）
+            try {
+                const treeUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+                const treeRes = await fetch(treeUrl, { headers });
+                if (treeRes.ok) {
+                    const treeData = await treeRes.json();
+                    if (treeData && Array.isArray(treeData.tree)) {
+                        for (const item of treeData.tree) {
+                            if (item.type !== 'blob') continue;
+                            const p = item.path || '';
+                            const name = p.split('/').pop() || '';
+                            const lowerName = name.toLowerCase();
+                            const isBackup = lowerName.endsWith('.zip') || lowerName.endsWith('.json') || lowerName.endsWith('.gz') || lowerName.includes('backup') || lowerName.includes('chatapp');
+                            if (!isBackup) continue;
+
+                            // 如果指定了文件夹，优先匹配该文件夹下的文件
+                            if (folderPath && !p.startsWith(folderPath + '/') && p !== folderPath) {
+                                // 仍保留作为全局备选，但标记优先级
+                            }
+
+                            backupCandidates.push({
+                                name: name,
+                                path: p,
+                                size: item.size || 0,
+                                sha: item.sha,
+                                downloadUrl: `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${p}`,
+                                htmlUrl: `https://github.com/${owner}/${repo}/blob/${branch}/${p}`
+                            });
+                        }
+
+                        if (backupCandidates.length > 0) {
+                            // 排序：同等条件下，如果在指定目录下的排在前面，其余按名称逆序（最新通常靠前）
+                            backupCandidates.sort((a, b) => {
+                                const aInFolder = folderPath ? a.path.startsWith(folderPath) : false;
+                                const bInFolder = folderPath ? b.path.startsWith(folderPath) : false;
+                                if (aInFolder && !bInFolder) return -1;
+                                if (!aInFolder && bInFolder) return 1;
+                                return b.name.localeCompare(a.name);
+                            });
+                            return backupCandidates;
+                        }
+                    }
+                }
+            } catch (treeErr) {
+                console.warn('[GitHubBackup] Git Trees 递归获取失败，回退 Contents API:', treeErr);
+            }
+
+            // 2. 回退方案：Contents API 逐级目录检索
             const tryFetchFolder = async (dir) => {
                 const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(dir)}?ref=${encodeURIComponent(branch)}`;
                 const res = await fetch(url, { headers });
@@ -219,7 +268,6 @@
             };
 
             let items = await tryFetchFolder(folderPath);
-            // 如果指定的文件夹为空且不是根目录，尝试扫描常见备选目录
             if ((!items || items.length === 0) && folderPath !== '' && folderPath !== 'backup') {
                 const backupItems = await tryFetchFolder('backup');
                 if (backupItems.length > 0) items = backupItems;
@@ -229,11 +277,10 @@
                 if (rootItems.length > 0) items = rootItems;
             }
 
-            // 筛选出所有备份文件候选（.zip, .json, .gz，或者名字包含 backup/chatapp）
             const backupFiles = items.filter(item => {
                 if (item.type !== 'file') return false;
                 const name = (item.name || '').toLowerCase();
-                return name.endsWith('.zip') || name.endsWith('.json') || name.endsWith('.gz') || name.includes('backup');
+                return name.endsWith('.zip') || name.endsWith('.json') || name.endsWith('.gz') || name.includes('backup') || name.includes('chatapp');
             }).map(item => ({
                 name: item.name,
                 path: item.path,
@@ -243,9 +290,7 @@
                 htmlUrl: item.html_url
             }));
 
-            // 排序：优先按名称中的时间戳或字母逆序排列（通常最新的在最前）
             backupFiles.sort((a, b) => b.name.localeCompare(a.name));
-
             return backupFiles;
         },
 
@@ -258,6 +303,7 @@
             };
 
             let sha = knownSha;
+            let actualPath = filePath;
 
             // 1. 如果没有传入 sha，先通过 contents API 获取文件元数据与 sha
             if (!sha) {
@@ -279,14 +325,24 @@
                 }
 
                 const meta = await metaRes.json();
+                // 如果返回的是文件夹列表数组，自动从中选取最优备份文件而不是报错中断
                 if (Array.isArray(meta)) {
-                    throw new Error(`路径 "${filePath}" 是一个文件夹，请选择具体的备份文件`);
-                }
-                sha = meta.sha;
-
-                // 如果文件很小，直接内嵌了 base64 内容
-                if (meta.content && meta.encoding === 'base64') {
-                    return await this.base64ToArrayBuffer(meta.content);
+                    const validFiles = meta.filter(item => {
+                        const n = (item.name || '').toLowerCase();
+                        return n.endsWith('.zip') || n.endsWith('.json') || n.endsWith('.gz') || n.includes('backup');
+                    });
+                    if (validFiles.length > 0) {
+                        validFiles.sort((a, b) => b.name.localeCompare(a.name));
+                        sha = validFiles[0].sha;
+                        actualPath = validFiles[0].path;
+                    } else {
+                        throw new Error(`文件夹 "${filePath}" 内暂无识别到的备份文件（.zip/.json）`);
+                    }
+                } else {
+                    sha = meta.sha;
+                    if (meta.content && meta.encoding === 'base64') {
+                        return await this.base64ToArrayBuffer(meta.content);
+                    }
                 }
             }
 
@@ -297,7 +353,6 @@
                     const blobRes = await fetch(blobUrl, { headers });
                     if (blobRes.ok) {
                         const contentType = blobRes.headers.get('content-type') || '';
-                        // 如果 GitHub 返回了 JSON 格式的 Blob 包装 (某些代理或特殊版本)
                         if (contentType.includes('application/json')) {
                             const blobJson = await blobRes.json();
                             if (blobJson.content && blobJson.encoding === 'base64') {
@@ -314,14 +369,25 @@
 
             // 3. 回退方案：Contents Raw 流式下载
             try {
-                const rawUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(filePath)}?ref=${encodeURIComponent(branch)}`;
+                const rawUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodeURI(actualPath)}?ref=${encodeURIComponent(branch)}`;
                 const rawRes = await fetch(rawUrl, { headers });
                 if (rawRes.ok) {
                     return await rawRes.arrayBuffer();
                 }
             } catch (e2) {}
 
-            throw new Error(`无法从 GitHub 下载文件: ${filePath}`);
+            // 4. 回退方案：raw.githubusercontent.com
+            try {
+                const rawUserUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${encodeURI(actualPath)}`;
+                const rawUserRes = await fetch(rawUserUrl, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (rawUserRes.ok) {
+                    return await rawUserRes.arrayBuffer();
+                }
+            } catch (e3) {}
+
+            throw new Error(`无法从 GitHub 下载文件: ${actualPath}`);
         },
 
         // 上传备份至 GitHub (支持任意体量大文件：通过 Git Data Blobs API 或 Contents API，自动采用 ZIP 压缩)

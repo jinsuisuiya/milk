@@ -324,8 +324,8 @@ const loadData = async () => {
         const savedStickers = getVal(9);
         const savedCustomThemes = getVal(10);
         const savedChatBg = getVal(11);
-        const partnerAvatarSrc = getVal(12);
-        const myAvatarSrc = getVal(13);
+        const partnerAvatarSrc = getVal(12) || (savedSettings && savedSettings.partnerAvatar) || (typeof settings !== 'undefined' ? settings.partnerAvatar : null);
+        const myAvatarSrc = getVal(13) || (savedSettings && savedSettings.myAvatar) || (typeof settings !== 'undefined' ? settings.myAvatar : null);
         const savedPartnerPersonas = getVal(14);
         const savedShowNameConfig = getVal(15);
         const savedThemeSchemes = getVal(16);

@@ -226,6 +226,12 @@
             inclMsgs: true, inclSet: true, inclCustom: true, inclAnn: true,
             inclThemes: true, inclDg: true, inclStickers: false
         };
+
+        // 导出前先强制保存当前内存状态，确保头像、昵称、设置等全部落盘
+        if (typeof saveData === 'function') {
+            try { await saveData(); } catch(e) {}
+        }
+
         var lfData = {};
         var keys = await localforage.keys();
         for (var i = 0; i < keys.length; i++) {
@@ -237,6 +243,43 @@
                 lfData[key] = deepCloneJsonSafe(rawVal);
             } catch (e) { console.warn('[backup] 读取失败', key, e); }
         }
+
+        // 显式确保头像、昵称与设置在勾选 inclSet 时被完整收录
+        if (flags.inclSet !== false) {
+            var curSid = typeof SESSION_ID !== 'undefined' ? SESSION_ID : 'default';
+            var appPfx = typeof APP_PREFIX !== 'undefined' ? APP_PREFIX : 'CHAT_APP_V3_';
+            var setKey = typeof getStorageKey === 'function' ? getStorageKey('chatSettings') : (appPfx + curSid + '_chatSettings');
+            var pAvKey = typeof getStorageKey === 'function' ? getStorageKey('partnerAvatar') : (appPfx + curSid + '_partnerAvatar');
+            var mAvKey = typeof getStorageKey === 'function' ? getStorageKey('myAvatar') : (appPfx + curSid + '_myAvatar');
+
+            if (typeof settings !== 'undefined' && settings) {
+                var clonedSet = deepCloneJsonSafe(settings);
+                if (!clonedSet.partnerName && typeof DOMElements !== 'undefined' && DOMElements.partner && DOMElements.partner.name) {
+                    clonedSet.partnerName = DOMElements.partner.name.textContent || '梦角';
+                }
+                if (!clonedSet.myName && typeof DOMElements !== 'undefined' && DOMElements.me && DOMElements.me.name) {
+                    clonedSet.myName = DOMElements.me.name.textContent || '我';
+                }
+                lfData[setKey] = clonedSet;
+            }
+
+            var pAvatar = null;
+            if (typeof DOMElements !== 'undefined' && DOMElements.partner && DOMElements.partner.avatar) {
+                var pImg = DOMElements.partner.avatar.querySelector('img');
+                if (pImg && pImg.src && !pImg.src.startsWith('data:image/svg')) pAvatar = pImg.src;
+            }
+            if (!pAvatar && typeof settings !== 'undefined' && settings.partnerAvatar) pAvatar = settings.partnerAvatar;
+            if (pAvatar && !lfData[pAvKey]) lfData[pAvKey] = pAvatar;
+
+            var mAvatar = null;
+            if (typeof DOMElements !== 'undefined' && DOMElements.me && DOMElements.me.avatar) {
+                var mImg = DOMElements.me.avatar.querySelector('img');
+                if (mImg && mImg.src && !mImg.src.startsWith('data:image/svg')) mAvatar = mImg.src;
+            }
+            if (!mAvatar && typeof settings !== 'undefined' && settings.myAvatar) mAvatar = settings.myAvatar;
+            if (mAvatar && !lfData[mAvKey]) lfData[mAvKey] = mAvatar;
+        }
+
         var lsData = {};
         for (var j = 0; j < localStorage.length; j++) {
             var lk = localStorage.key(j);
@@ -561,6 +604,41 @@
         var lfRaw = getLfSource(data);
         var lsRaw = data.localStorage || {};
 
+        var curSid = typeof SESSION_ID !== 'undefined' ? SESSION_ID : 'default';
+        var appPfx = data.appPrefix || (typeof APP_PREFIX !== 'undefined' ? APP_PREFIX : 'CHAT_APP_V3_');
+
+        // 兼容单文件旧版导出格式（含顶级 settings、partnerAvatar、myAvatar、messages 等）
+        if (data.settings || data.partnerAvatar || data.myAvatar || Array.isArray(data.messages)) {
+            if (data.settings) {
+                var setKey = appPfx + curSid + '_chatSettings';
+                if (!lfRaw[setKey]) lfRaw[setKey] = deepCloneJsonSafe(data.settings);
+            }
+            if (data.partnerAvatar) {
+                var pAvKey = appPfx + curSid + '_partnerAvatar';
+                if (!lfRaw[pAvKey]) lfRaw[pAvKey] = data.partnerAvatar;
+            }
+            if (data.myAvatar) {
+                var mAvKey = appPfx + curSid + '_myAvatar';
+                if (!lfRaw[mAvKey]) lfRaw[mAvKey] = data.myAvatar;
+            }
+            if (Array.isArray(data.messages)) {
+                var msgKey = appPfx + curSid + '_chatMessages';
+                if (!lfRaw[msgKey]) lfRaw[msgKey] = data.messages;
+            }
+            if (Array.isArray(data.customReplies)) {
+                var repKey = appPfx + curSid + '_customReplies';
+                if (!lfRaw[repKey]) lfRaw[repKey] = data.customReplies;
+            }
+            if (Array.isArray(data.anniversaries)) {
+                var annKey = appPfx + curSid + '_anniversaries';
+                if (!lfRaw[annKey]) lfRaw[annKey] = data.anniversaries;
+            }
+            if (Array.isArray(data.customThemes)) {
+                var thmKey = appPfx + 'customThemes';
+                if (!lfRaw[thmKey]) lfRaw[thmKey] = data.customThemes;
+            }
+        }
+
         if (selective && opt.selectedCategoryIds && opt.categories) {
             lfRaw = filterLfByCategories(lfRaw, opt.selectedCategoryIds, opt.categories);
             lsRaw = filterLsByCategories(lsRaw, opt.selectedCategoryIds, opt.categories);
@@ -568,8 +646,6 @@
 
         var lfKeys = Object.keys(lfRaw);
         var backupSid = data.sessionId || inferBackupSessionId(lfKeys, data.appPrefix);
-        var curSid = typeof SESSION_ID !== 'undefined' ? SESSION_ID : null;
-        var appPfx = data.appPrefix || (typeof APP_PREFIX !== 'undefined' ? APP_PREFIX : 'CHAT_APP_V3_');
         var needRemap = backupSid && curSid && backupSid !== curSid;
 
         for (var i = 0; i < lfKeys.length; i++) {
@@ -578,6 +654,12 @@
             var val = inlineMediaTree(lfRaw[lk], mediaStore);
             try {
                 await localforage.setItem(targetKey, val);
+                // 同步当前内存 settings
+                if (targetKey.indexOf('_chatSettings') !== -1 && val && typeof val === 'object') {
+                    if (typeof settings !== 'undefined' && settings) {
+                        Object.assign(settings, val);
+                    }
+                }
             } catch (e) {
                 console.warn('[backup] 写入失败', targetKey, e);
             }
@@ -588,10 +670,9 @@
             var targetLsKey = needRemap ? remapLfKey(k, backupSid, curSid, appPfx) : k;
             try {
                 var lsv = processLocalStorageValueForImport(lsRaw[k], mediaStore);
-                if (typeof lsv === 'string' && lsv.indexOf('data:image/') === 0 && lsv.length > 2000) continue;
                 localStorage.setItem(targetLsKey, lsv);
             } catch (e2) {
-                console.warn('[backup] localStorage 恢复失败', targetLsKey, e2);
+                console.warn('[backup] localStorage 恢复跳过或超出配额', targetLsKey, e2);
             }
         }
 

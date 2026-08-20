@@ -186,9 +186,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             font-family: 'Noto Serif SC', serif;
-            overflow: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: max(16px, env(safe-area-inset-top, 16px)) 12px max(16px, env(safe-area-inset-bottom, 16px));
+            box-sizing: border-box;
             transition: opacity 0.9s ease;
         }
         #splash-declaration.splash-fade-out {
@@ -237,6 +240,7 @@
             position: relative;
             z-index: 2;
             width: min(500px, 93vw);
+            margin: auto 0;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -11241,4 +11245,347 @@
 .gh-tab-btn:hover {
     background-color: rgba(var(--accent-color-rgb), 0.05);
 }
+
+/* ══ 桌面悬浮桌宠 (Floating Pet) 防白罩 / 防高亮样式 ══ */
+#floating-pet-widget,
+#floating-pet-widget *,
+#floating-pet-avatar-wrap,
+.floating-pet-avatar-img,
+.floating-pet-badge {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    outline: none !important;
+}
+#floating-pet-avatar-wrap {
+    background: transparent !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important;
+}
+.floating-pet-avatar-img {
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    pointer-events: none !important;
+    display: block !important;
+}
+#floating-pet-widget:active,
+#floating-pet-widget:focus,
+#floating-pet-widget:hover,
+#floating-pet-avatar-wrap:active,
+#floating-pet-avatar-wrap:focus,
+#floating-pet-avatar-wrap:hover,
+.floating-pet-avatar-img:active,
+.floating-pet-avatar-img:focus {
+    outline: none !important;
+    background: transparent !important;
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+}
+#floating-pet-widget::before,
+#floating-pet-widget::after,
+#floating-pet-avatar-wrap::before,
+#floating-pet-avatar-wrap::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   小屏幕手机（如 iPhone 6s 375px / iPhone SE 320px 及短屏幕）全界面完整适配
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px), (max-height: 720px) {
+    /* 声明闪屏适配 */
+    .splash-inner {
+        width: min(480px, 95vw);
+    }
+    .splash-badge {
+        padding: 4px 12px;
+        font-size: 10px;
+        margin-bottom: 10px;
+    }
+    .splash-dots {
+        margin-bottom: 12px;
+        gap: 5px;
+    }
+    .splash-card {
+        border-radius: 18px;
+    }
+    .splash-card-body {
+        padding: 16px 15px 14px;
+    }
+    .splash-slides {
+        min-height: 160px;
+    }
+    .splash-slide-tag {
+        font-size: 9.5px;
+        margin-bottom: 6px;
+    }
+    .splash-slide-title {
+        font-size: 16px;
+        margin-bottom: 10px;
+        line-height: 1.35;
+    }
+    .splash-slide-body {
+        font-size: 12px;
+        line-height: 1.65;
+    }
+    .splash-slide-body .splash-highlight-box {
+        margin-top: 10px;
+        padding: 8px 12px;
+        font-size: 11px;
+        line-height: 1.55;
+    }
+    .splash-pledge-desc {
+        font-size: 11px;
+        margin-bottom: 8px;
+        line-height: 1.5;
+    }
+    .splash-pledge-required {
+        font-size: 12px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        line-height: 1.5;
+    }
+    .splash-pledge-input {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    .splash-pledge-hint {
+        font-size: 10px;
+        margin-top: 6px;
+        min-height: 14px;
+    }
+    .splash-divider {
+        margin: 12px 0;
+    }
+    .splash-footer {
+        padding: 0 15px 12px;
+    }
+    .splash-btn {
+        padding: 8px 15px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* 顶栏与安全区适配 */
+    .header {
+        padding-top: max(2px, env(safe-area-inset-top, 2px));
+    }
+    .header-inner {
+        padding: 4px 6px;
+        gap: 3px;
+        max-width: 100vw;
+    }
+    .header-motto {
+        font-size: 9px;
+        letter-spacing: 1.5px;
+        padding: 2px 8px;
+        gap: 8px;
+        max-width: 95vw;
+    }
+    .header-motto::before,
+    .header-motto::after {
+        width: 14px;
+    }
+    .user-info {
+        min-width: 38px;
+        max-width: 50px;
+        flex-shrink: 0;
+    }
+    .avatar-container {
+        width: 38px;
+        height: 38px;
+    }
+    .avatar {
+        width: 38px;
+        height: 38px;
+    }
+    .username {
+        font-size: 10.5px;
+        max-width: 48px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .status {
+        font-size: 8.5px;
+        padding: 1px 3px;
+    }
+    .header-actions {
+        gap: 2px;
+        flex: 1;
+        justify-content: center;
+        min-width: 0;
+    }
+    .action-btn {
+        width: 29px;
+        height: 29px;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    /* 聊天区域与消息气泡 */
+    .main-chat-area {
+        padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
+    .chat-container {
+        padding: 12px 6px calc(65px + env(safe-area-inset-bottom, 0px)) 6px;
+    }
+    .message-wrapper {
+        max-width: 92%;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+    .message-avatar {
+        width: 30px !important;
+        height: 30px !important;
+    }
+    .message {
+        padding: 8px 12px;
+        font-size: 13.5px;
+        line-height: 1.45;
+    }
+
+    /* 底部输入栏 */
+    .input-area {
+        padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)) 6px;
+        gap: 4px;
+    }
+    .input-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 13px;
+    }
+    .message-input {
+        min-height: 34px;
+        padding: 7px 9px;
+        font-size: 13.5px;
+    }
+    .input-buttons {
+        gap: 3px;
+    }
+
+    /* 模态框全局适配小屏 */
+    .modal {
+        padding: max(8px, env(safe-area-inset-top, 8px)) 8px max(8px, env(safe-area-inset-bottom, 8px));
+        box-sizing: border-box;
+    }
+    .modal-content {
+        width: 100% !important;
+        max-width: min(440px, calc(100vw - 16px)) !important;
+        max-height: min(90vh, 90dvh) !important;
+        padding: 16px 14px 14px !important;
+        border-radius: 18px !important;
+        box-sizing: border-box !important;
+    }
+    .modal-title {
+        font-size: 15px !important;
+        margin-bottom: 10px !important;
+    }
+    .modal-input, .modal-textarea {
+        padding: 8px 11px !important;
+        font-size: 13px !important;
+        margin-bottom: 10px !important;
+    }
+    .modal-buttons {
+        gap: 8px !important;
+        margin-top: 10px !important;
+    }
+    .modal-btn {
+        padding: 7px 14px !important;
+        font-size: 12px !important;
+    }
+
+    /* 快捷表情浮层 */
+    .sticker-picker-popover {
+        width: calc(100vw - 16px) !important;
+        max-width: 360px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        right: auto !important;
+        bottom: calc(100% + 5px) !important;
+        max-height: min(320px, calc(100dvh - 120px)) !important;
+        height: min(320px, calc(100dvh - 120px)) !important;
+    }
+}
+
+/* 针对 iPhone 6s (375px) 及超窄屏 (≤380px) 的精致优化 */
+@media (max-width: 380px) {
+    .header-inner {
+        padding: 3px 4px;
+        gap: 2px;
+    }
+    .user-info {
+        min-width: 34px;
+        max-width: 44px;
+    }
+    .avatar-container {
+        width: 34px;
+        height: 34px;
+    }
+    .avatar {
+        width: 34px;
+        height: 34px;
+    }
+    .username {
+        font-size: 9.5px;
+        max-width: 42px;
+    }
+    .status {
+        font-size: 8px;
+        padding: 1px 2px;
+    }
+    .action-btn {
+        width: 27px;
+        height: 27px;
+        font-size: 12px;
+    }
+    .header-motto {
+        font-size: 8px;
+        letter-spacing: 1px;
+        padding: 1px 4px;
+    }
+    .input-area {
+        padding: 5px 4px calc(5px + env(safe-area-inset-bottom, 0px)) 4px;
+        gap: 3px;
+    }
+    .input-btn {
+        width: 31px;
+        height: 31px;
+        font-size: 12px;
+    }
+    .message-input {
+        min-height: 31px;
+        padding: 6px 7px;
+        font-size: 13px;
+    }
+    .input-buttons {
+        gap: 2px;
+    }
+    .settings-grid {
+        gap: 6px;
+        padding: 2px 0;
+    }
+    .settings-card {
+        padding: 10px 5px;
+        gap: 4px;
+        border-radius: 12px;
+    }
+    .settings-card i {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    .settings-card span {
+        font-size: 10.5px;
+    }
+    .modal-content {
+        padding: 14px 10px 10px !important;
+    }
+}
+
+
 

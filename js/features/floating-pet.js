@@ -285,10 +285,63 @@
 
         mount() {
             if (document.getElementById('floating-pet-widget')) return;
+            this.injectTransparentStyles();
             this.createWidgetDOM();
             this.applyConfig();
             this.bindWindowEvents();
             this.listenToNewMessages();
+        }
+
+        injectTransparentStyles() {
+            if (document.getElementById('floating-pet-global-override-style')) return;
+            const style = document.createElement('style');
+            style.id = 'floating-pet-global-override-style';
+            style.textContent = `
+                #floating-pet-widget,
+                #floating-pet-widget *,
+                #floating-pet-avatar-wrap,
+                .floating-pet-avatar-img,
+                .floating-pet-badge {
+                    -webkit-tap-highlight-color: transparent !important;
+                    -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+                    -webkit-touch-callout: none !important;
+                    -webkit-user-select: none !important;
+                    user-select: none !important;
+                    outline: none !important;
+                }
+                #floating-pet-avatar-wrap {
+                    background: transparent !important;
+                    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important;
+                }
+                .floating-pet-avatar-img {
+                    background: transparent !important;
+                    mix-blend-mode: normal !important;
+                    filter: none !important;
+                    pointer-events: none !important;
+                    display: block !important;
+                }
+                #floating-pet-widget:active,
+                #floating-pet-widget:focus,
+                #floating-pet-widget:hover,
+                #floating-pet-avatar-wrap:active,
+                #floating-pet-avatar-wrap:focus,
+                #floating-pet-avatar-wrap:hover,
+                .floating-pet-avatar-img:active,
+                .floating-pet-avatar-img:focus {
+                    outline: none !important;
+                    background: transparent !important;
+                    -webkit-tap-highlight-color: transparent !important;
+                    -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+                }
+                #floating-pet-widget::before,
+                #floating-pet-widget::after,
+                #floating-pet-avatar-wrap::before,
+                #floating-pet-avatar-wrap::after {
+                    display: none !important;
+                    content: none !important;
+                }
+            `;
+            document.head.appendChild(style);
         }
 
         createWidgetDOM() {
