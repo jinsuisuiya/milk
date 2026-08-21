@@ -8,6 +8,9 @@
     'use strict';
 
     const CONFIG_KEY = 'chatapp_github_backup_config';
+    // GitHub 单文件备份过大时容易触发 API / 浏览器 / 网络限制。自动切成 8 MiB 分片。
+    const LARGE_BACKUP_CHUNK_SIZE = 8 * 1024 * 1024;
+    const LARGE_BACKUP_MANIFEST_SUFFIX = '.manifest.json';
 
     // 默认配置（默认优先使用 .zip 格式，体积小 80-90% 且解析极度稳定）
     const DEFAULT_CONFIG = {
@@ -390,7 +393,128 @@
             throw new Error(`无法从 GitHub 下载文件: ${actualPath}`);
         },
 
-        // 上传备份至 GitHub (支持任意体量大文件：通过 Git Data Blobs API 或 Contents API，自动采用 ZIP 压缩)
+        // 大备份分片上传：多个 8 MiB blob + 一个 manifest，一次 commit 完成。
+        async uploadBackupInChunks(cfg, path, branch, rawBuffer, commitMessage) {
+            const token = (cfg.token || '').trim();
+            const owner = (cfg.owner || '').trim();
+            const repo = (cfg.repo || '').trim();
+            const headers = {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'ChatApp-Backup'
+            };
+
+            const chunkSize = LARGE_BACKUP_CHUNK_SIZE;
+            const total = Math.ceil(rawBuffer.byteLength / chunkSize);
+            const basePath = path.replace(/\.zip$/i, '');
+            const manifestPath = path + LARGE_BACKUP_MANIFEST_SUFFIX;
+            const chunks = [];
+            const blobEntries = [];
+
+            for (let i = 0; i < total; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(rawBuffer.byteLength, start + chunkSize);
+                const chunk = rawBuffer.slice(start, end);
+                const partNo = String(i + 1).padStart(3, '0');
+                const chunkPath = `${basePath}.part-${partNo}`;
+                const chunkB64 = await this.arrayBufferToBase64(chunk);
+
+                const blobRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ content: chunkB64, encoding: 'base64' })
+                });
+                if (!blobRes.ok) {
+                    const err = await blobRes.json().catch(() => ({}));
+                    throw new Error(`上传备份分片 ${i + 1}/${total} 失败 (${blobRes.status}): ${err.message || blobRes.statusText}`);
+                }
+                const blob = await blobRes.json();
+                chunks.push({ index: i + 1, path: chunkPath, sha: blob.sha, size: chunk.byteLength });
+                blobEntries.push({ path: chunkPath, mode: '100644', type: 'blob', sha: blob.sha });
+            }
+
+            const manifest = {
+                type: 'chatapp-backup-manifest',
+                formatVersion: 1,
+                originalPath: path,
+                originalSize: rawBuffer.byteLength,
+                chunkSize,
+                totalChunks: total,
+                chunks,
+                createdAt: new Date().toISOString()
+            };
+            const manifestBlobRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/blobs`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    content: await this.stringToBase64(JSON.stringify(manifest)),
+                    encoding: 'base64'
+                })
+            });
+            if (!manifestBlobRes.ok) {
+                const err = await manifestBlobRes.json().catch(() => ({}));
+                throw new Error(`上传备份索引失败 (${manifestBlobRes.status}): ${err.message || manifestBlobRes.statusText}`);
+            }
+            const manifestBlob = await manifestBlobRes.json();
+            blobEntries.push({ path: manifestPath, mode: '100644', type: 'blob', sha: manifestBlob.sha });
+
+            const branchRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodeURIComponent(branch)}`, { headers });
+            let latestCommitSha = null;
+            let baseTreeSha = null;
+            if (branchRes.ok) {
+                const branchData = await branchRes.json();
+                latestCommitSha = branchData.commit?.sha;
+                baseTreeSha = branchData.commit?.commit?.tree?.sha;
+            }
+
+            const treeBody = { tree: blobEntries };
+            if (baseTreeSha) treeBody.base_tree = baseTreeSha;
+            const treeRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees`, {
+                method: 'POST', headers, body: JSON.stringify(treeBody)
+            });
+            if (!treeRes.ok) {
+                const err = await treeRes.json().catch(() => ({}));
+                throw new Error(`创建分片备份文件树失败 (${treeRes.status}): ${err.message || treeRes.statusText}`);
+            }
+            const treeData = await treeRes.json();
+
+            const commitRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/commits`, {
+                method: 'POST', headers, body: JSON.stringify({
+                    message: commitMessage + ` [分片 ${total}×8MiB]`,
+                    tree: treeData.sha,
+                    parents: latestCommitSha ? [latestCommitSha] : []
+                })
+            });
+            if (!commitRes.ok) {
+                const err = await commitRes.json().catch(() => ({}));
+                throw new Error(`创建分片备份提交失败 (${commitRes.status}): ${err.message || commitRes.statusText}`);
+            }
+            const commitData = await commitRes.json();
+
+            const refUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branch)}`;
+            let refRes = await fetch(refUrl, {
+                method: 'PATCH', headers, body: JSON.stringify({ sha: commitData.sha, force: true })
+            });
+            if (refRes.status === 404 || refRes.status === 422) {
+                refRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs`, {
+                    method: 'POST', headers, body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commitData.sha })
+                });
+            }
+            if (!refRes.ok) {
+                const err = await refRes.json().catch(() => ({}));
+                throw new Error(`更新分支失败 (${refRes.status}): ${err.message || refRes.statusText}`);
+            }
+
+            return {
+                sha: commitData.sha,
+                url: `https://github.com/${owner}/${repo}/commit/${commitData.sha}`,
+                manifestPath,
+                chunks: total
+            };
+        },
+
+        // 上传备份至 GitHub (支持普通 ZIP 与自动分片大 ZIP)
         async uploadBackup(options = {}) {
             const cfg = this.getConfig();
             const token = (cfg.token || '').trim();
@@ -445,6 +569,28 @@
             }
 
             const fileSize = rawBuffer.byteLength;
+
+            // 超过 8 MiB 自动分片，避免 GitHub 单文件上传/下载在移动端或网络不稳定时失败。
+            if (fileSize > LARGE_BACKUP_CHUNK_SIZE) {
+                const chunkCommitMessage = options.commitMessage || `Data Backup: ${new Date().toLocaleString()} (传讯ZIP大文件分片备份 - ${(fileSize / 1024 / 1024).toFixed(1)} MB)`;
+                const chunkResult = await this.uploadBackupInChunks(cfg, path, branch, rawBuffer, chunkCommitMessage);
+                const nowTime = new Date().toISOString();
+                this.saveConfig({
+                    path: chunkResult.manifestPath,
+                    lastBackupTime: nowTime,
+                    lastBackupSha: chunkResult.sha,
+                    lastBackupUrl: chunkResult.url
+                });
+                return {
+                    ok: true,
+                    time: nowTime,
+                    sha: chunkResult.sha,
+                    url: chunkResult.url,
+                    size: fileSize,
+                    path: chunkResult.manifestPath,
+                    chunks: chunkResult.chunks
+                };
+            }
 
             // 2. 转换为高效 Base64
             const base64Content = await this.arrayBufferToBase64(rawBuffer);
@@ -686,6 +832,37 @@
                 throw new Error('未能从 GitHub 下载到有效备份数据');
             }
 
+            // 大备份 manifest：按索引顺序下载各分片并在本地重新拼接。
+            try {
+                const manifestText = new TextDecoder('utf-8').decode(ab).replace(/^\uFEFF/, '').trim();
+                const manifest = JSON.parse(manifestText);
+                if (manifest && manifest.type === 'chatapp-backup-manifest' && Array.isArray(manifest.chunks)) {
+                    const buffers = [];
+                    let totalBytes = 0;
+                    for (const part of manifest.chunks) {
+                        if (!part || !part.path) throw new Error('备份分片索引损坏');
+                        const partBuffer = await this.downloadRemoteFileBinary(owner, repo, branch, part.path, token, part.sha || null);
+                        if (!partBuffer || partBuffer.byteLength === 0) throw new Error(`备份分片 ${part.index || '?'} 下载为空`);
+                        buffers.push(partBuffer);
+                        totalBytes += partBuffer.byteLength;
+                    }
+                    if (manifest.originalSize && totalBytes !== manifest.originalSize) {
+                        throw new Error(`备份分片拼接后大小不一致：预期 ${(manifest.originalSize / 1024 / 1024).toFixed(1)} MB，实际 ${(totalBytes / 1024 / 1024).toFixed(1)} MB`);
+                    }
+                    const merged = new Uint8Array(totalBytes);
+                    let offset = 0;
+                    for (const partBuffer of buffers) {
+                        merged.set(new Uint8Array(partBuffer), offset);
+                        offset += partBuffer.byteLength;
+                    }
+                    ab = merged.buffer;
+                    actualFilePath = manifest.originalPath || actualFilePath;
+                }
+            } catch (manifestErr) {
+                // 普通 ZIP/JSON 不是 manifest，继续按原流程解析。只有明确识别到 manifest 时才抛出错误。
+                if (manifestErr && /备份分片|分片索引|拼接后大小/.test(manifestErr.message || '')) throw manifestErr;
+            }
+
             // 3. 使用备份引擎的万能多格式解析器解析数据（支持 ZIP、GZIP、标准 JSON、BOM 头）
             if (typeof ChatBackup === 'undefined' || !ChatBackup.loadBackupFromArrayBuffer) {
                 throw new Error('备份解析引擎未就绪');
@@ -725,18 +902,10 @@
             // 切换到指定标签页
             this.switchTab(modal, initialTab);
 
-            // 关闭可能重叠打开的其它弹窗
-            ['settings-modal', 'advanced-modal', 'data-modal', 'chat-modal', 'appearance-modal'].forEach(id => {
-                const other = document.getElementById(id);
-                if (other) {
-                    if (typeof hideModal === 'function') {
-                        try { hideModal(other); } catch (e) {}
-                    }
-                    other.style.display = 'none';
-                }
-            });
-
+            // 备份窗口作为当前页面上的独立浮层打开，不再强制关闭设置/高级设置。
+            // 完成备份后关闭浮层即可回到原来的页面。
             modal.style.display = 'flex';
+            modal.style.zIndex = '10050';
             document.body.style.overflow = 'hidden';
         },
 

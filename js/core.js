@@ -855,6 +855,8 @@ function manageAutoSendTimer() {
             document.documentElement.style.setProperty('--avatar-align', _alignMap[settings.inChatAvatarPosition || 'center'] || 'center');
             if (settings.inChatAvatarPosition === 'custom' && settings.inChatAvatarCustomOffset !== undefined) {
                 document.documentElement.style.setProperty('--avatar-custom-offset', settings.inChatAvatarCustomOffset + 'px');
+            } else {
+                document.documentElement.style.removeProperty('--avatar-custom-offset');
             }
             document.body.classList.toggle('always-show-avatar', !!settings.alwaysShowAvatar);
             if (typeof _applyCollapseState === 'function') _applyCollapseState(!!settings.bottomCollapseMode);
@@ -1050,9 +1052,6 @@ function createMessageFragment(msg, prevMsg, nextMsg, lastSenderRef) {
 
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'message-avatar';
-    if (settings.inChatAvatarPosition === 'custom' && settings.inChatAvatarCustomOffset !== undefined) {
-        avatarDiv.style.marginTop = settings.inChatAvatarCustomOffset + 'px';
-    }
 
     const groupMember = (msg.sender !== 'user' && typeof getGroupMemberForMessage === 'function') ? getGroupMemberForMessage(msg.id) : null;
 
