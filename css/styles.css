@@ -11684,3 +11684,63 @@
     opacity: 1 !important;
     transform: translateY(0) scale(1) !important;
 }
+
+
+/* ===== G老师响应式适配补丁 ===== */
+/* 适配 iPhone 6s / SE / 安卓小屏 / 全面屏 */
+
+html, body {
+    width: 100%;
+    min-height: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    min-height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+#app, .app, .phone-container, .chat-container {
+    max-width: 430px;
+    width: 100%;
+    min-height: 100dvh;
+    margin: 0 auto;
+}
+
+button, input, textarea {
+    max-width: 100%;
+}
+
+.combo-menu,
+.emoji-panel,
+.sticker-panel,
+#combo-menu {
+    max-width: calc(100vw - 20px) !important;
+    width: min(360px, calc(100vw - 20px)) !important;
+    left: 10px !important;
+    right: auto !important;
+    bottom: calc(65px + env(safe-area-inset-bottom)) !important;
+}
+
+.modal,
+.modal-content,
+.pet-modal {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+}
+
+@media (max-width: 375px) {
+    .chat-header,
+    .bottom-bar,
+    .input-area {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .emoji-panel,
+    .combo-menu {
+        font-size: 14px;
+    }
+}
