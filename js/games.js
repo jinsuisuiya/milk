@@ -1728,3 +1728,11 @@ function initComboMenu() {
     };
 
 })();
+
+
+// 初始化快捷表情弹窗
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initComboMenu);
+} else {
+    initComboMenu();
+}

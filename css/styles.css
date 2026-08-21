@@ -11625,3 +11625,24 @@
 
 
 
+
+/* floating pet modal emergency fix */
+#floating-pet-modal {
+    z-index: 999999 !important;
+    pointer-events: auto !important;
+}
+
+#floating-pet-modal .modal-content,
+#floating-pet-modal > div {
+    z-index: 1000000 !important;
+    pointer-events: auto !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+}
+
+#floating-pet-modal button,
+#floating-pet-modal input,
+#floating-pet-modal label,
+#floating-pet-modal select {
+    pointer-events: auto !important;
+}
