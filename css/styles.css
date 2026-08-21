@@ -11235,6 +11235,19 @@
 .css-preset-clear { opacity: 0.6; }
 .css-preset-clear:hover { opacity: 1; border-color: #e85252; background: rgba(232,82,82,0.06); }
 
+/* GitHub 备份是普通浮层：页面初始状态必须保持隐藏，不参与全屏模态系统 */
+#github-backup-modal {
+    display: none !important;
+    position: fixed !important;
+    inset: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    z-index: 200000 !important;
+    background: rgba(0,0,0,.65) !important;
+}
+
 /* ══ GitHub 云端备份模态框样式 ══ */
 #github-backup-modal {
     position: fixed !important;
@@ -11765,7 +11778,6 @@ body .modal.fullscreen-modal,
 #wheel-modal,
 #todo-modal,
 #floating-pet-modal,
-#github-backup-modal,
 #group-chat-modal,
 #envelope-modal,
 #envelope-view-modal {
@@ -12018,7 +12030,6 @@ html, body {
 #wheel-modal,
 #todo-modal,
 #floating-pet-modal,
-#github-backup-modal,
 #group-chat-modal,
 #envelope-modal,
 #envelope-view-modal,
@@ -12071,7 +12082,6 @@ div[id].modal.fullscreen-modal {
 #wheel-modal .modal-content,
 #todo-modal .modal-content,
 #floating-pet-modal .modal-content,
-#github-backup-modal .modal-content,
 #github-backup-modal .github-backup-dialog,
 #group-chat-modal .modal-content,
 #envelope-modal .modal-content,
@@ -12470,4 +12480,23 @@ textarea:focus-visible,
 select:focus-visible {
     outline: 2px solid rgba(var(--accent-color-rgb), .28) !important;
     outline-offset: 1px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Modal visibility guard v3
+   统一由 .active 控制弹窗显示，避免 CSS/inline style 冲突导致
+   页面加载时多个弹窗同时“自己跳出来”。
+   ══════════════════════════════════════════════════════════════ */
+.modal {
+    display: none !important;
+}
+.modal.active {
+    display: flex !important;
+}
+#github-backup-modal {
+    display: none !important;
+}
+#github-backup-modal.active {
+    display: flex !important;
 }

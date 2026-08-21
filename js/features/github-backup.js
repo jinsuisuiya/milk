@@ -904,6 +904,7 @@
 
             // 备份窗口作为当前页面上的独立浮层打开，不再强制关闭设置/高级设置。
             // 完成备份后关闭浮层即可回到原来的页面。
+            modal.classList.add('active');
             modal.style.display = 'flex';
             modal.style.zIndex = '10050';
             document.body.style.overflow = 'hidden';
@@ -912,6 +913,7 @@
         closeModal() {
             const modal = document.getElementById('github-backup-modal');
             if (modal) {
+                modal.classList.remove('active');
                 modal.style.display = 'none';
                 document.body.style.overflow = '';
             }
