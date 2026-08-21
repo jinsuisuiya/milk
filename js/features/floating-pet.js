@@ -300,18 +300,25 @@
                 #floating-pet-widget,
                 #floating-pet-widget *,
                 #floating-pet-avatar-wrap,
+                .floating-pet-avatar-wrap,
                 .floating-pet-avatar-img,
-                .floating-pet-badge {
+                .floating-pet-badge,
+                .floating-pet-bubble,
+                .pet-bubble-text {
                     -webkit-tap-highlight-color: transparent !important;
                     -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
                     -webkit-touch-callout: none !important;
                     -webkit-user-select: none !important;
                     user-select: none !important;
+                    -webkit-user-drag: none !important;
                     outline: none !important;
+                    border-color: inherit;
                 }
                 #floating-pet-avatar-wrap {
                     background: transparent !important;
                     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25) !important;
+                    -webkit-tap-highlight-color: transparent !important;
+                    -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
                 }
                 .floating-pet-avatar-img {
                     background: transparent !important;
@@ -319,6 +326,8 @@
                     filter: none !important;
                     pointer-events: none !important;
                     display: block !important;
+                    -webkit-user-drag: none !important;
+                    -webkit-touch-callout: none !important;
                 }
                 #floating-pet-widget:active,
                 #floating-pet-widget:focus,
@@ -358,6 +367,8 @@
                 user-select: none;
                 -webkit-user-select: none;
                 touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+                -webkit-touch-callout: none;
                 transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.2s ease;
             `;
 
@@ -431,16 +442,21 @@
                 border: 2.5px solid var(--accent-color, #FF6B8B);
                 overflow: visible;
                 cursor: pointer;
-                -webkit-tap-highlight-color: transparent;
+                -webkit-tap-highlight-color: transparent !important;
+                -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+                -webkit-touch-callout: none;
                 outline: none;
                 user-select: none;
                 -webkit-user-select: none;
+                touch-action: none;
                 transition: transform 0.16s cubic-bezier(0.3, 1.4, 0.5, 1);
             `;
 
             // 头像图像 (展示对方头像或自定义图片，透明底)
             const avatarImg = document.createElement('img');
             avatarImg.className = 'floating-pet-avatar-img';
+            avatarImg.setAttribute('draggable', 'false');
+            avatarImg.setAttribute('alt', '');
             avatarImg.style.cssText = `
                 width: 100%;
                 height: 100%;
@@ -449,7 +465,12 @@
                 pointer-events: none;
                 background: transparent;
                 display: block;
-                -webkit-tap-highlight-color: transparent;
+                -webkit-tap-highlight-color: transparent !important;
+                -webkit-tap-highlight-color: rgba(0,0,0,0) !important;
+                -webkit-user-drag: none;
+                -webkit-touch-callout: none;
+                user-select: none;
+                -webkit-user-select: none;
             `;
             avatarWrap.appendChild(avatarImg);
 
@@ -471,6 +492,7 @@
                 color: #FFF;
                 font-size: 8.5px;
                 box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+                pointer-events: none;
             `;
             badge.innerHTML = '<i class="fas fa-heart"></i>';
             avatarWrap.appendChild(badge);
@@ -549,16 +571,15 @@
             let startX = 0, startY = 0;
             let origLeft = 0, origTop = 0;
             let isMoved = false;
-            let longPressTimer = null;
 
-            const onPointerDown = (e) => {
+            const handleStart = (clientX, clientY, e) => {
+                if (e && e.cancelable) {
+                    e.preventDefault();
+                }
                 this.isDragging = true;
                 isMoved = false;
                 el.style.cursor = 'grabbing';
                 el.style.transition = 'none';
-
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
                 startX = clientX;
                 startY = clientY;
@@ -570,17 +591,20 @@
                 window.addEventListener('pointermove', onPointerMove, { passive: false });
                 window.addEventListener('pointerup', onPointerUp);
                 window.addEventListener('pointercancel', onPointerUp);
+                window.addEventListener('touchmove', onTouchMove, { passive: false });
+                window.addEventListener('touchend', onTouchEnd);
+                window.addEventListener('touchcancel', onTouchEnd);
             };
 
-            const onPointerMove = (e) => {
+            const handleMove = (clientX, clientY, e) => {
                 if (!this.isDragging) return;
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
+                if (e && e.cancelable) {
+                    e.preventDefault();
+                }
                 const dx = clientX - startX;
                 const dy = clientY - startY;
 
-                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
                     isMoved = true;
                 }
 
@@ -603,7 +627,7 @@
                 this.currentY = newTop;
             };
 
-            const onPointerUp = () => {
+            const handleEnd = (e) => {
                 if (!this.isDragging) return;
                 this.isDragging = false;
                 el.style.cursor = 'grab';
@@ -612,6 +636,9 @@
                 window.removeEventListener('pointermove', onPointerMove);
                 window.removeEventListener('pointerup', onPointerUp);
                 window.removeEventListener('pointercancel', onPointerUp);
+                window.removeEventListener('touchmove', onTouchMove);
+                window.removeEventListener('touchend', onTouchEnd);
+                window.removeEventListener('touchcancel', onTouchEnd);
 
                 this.saveConfig({ posX: this.currentX, posY: this.currentY });
 
@@ -620,7 +647,42 @@
                 }
             };
 
+            const onPointerDown = (e) => {
+                if (e.pointerType === 'touch') return; // touchstart will handle touch to avoid double triggers
+                handleStart(e.clientX, e.clientY, e);
+            };
+
+            const onPointerMove = (e) => {
+                handleMove(e.clientX, e.clientY, e);
+            };
+
+            const onPointerUp = (e) => {
+                handleEnd(e);
+            };
+
+            const onTouchStart = (e) => {
+                if (e.touches && e.touches.length > 0) {
+                    handleStart(e.touches[0].clientX, e.touches[0].clientY, e);
+                }
+            };
+
+            const onTouchMove = (e) => {
+                if (e.touches && e.touches.length > 0) {
+                    handleMove(e.touches[0].clientX, e.touches[0].clientY, e);
+                }
+            };
+
+            const onTouchEnd = (e) => {
+                handleEnd(e);
+            };
+
             this.avatarEl.addEventListener('pointerdown', onPointerDown);
+            this.avatarEl.addEventListener('touchstart', onTouchStart, { passive: false });
+            this.avatarEl.addEventListener('contextmenu', (e) => e.preventDefault());
+            this.avatarEl.addEventListener('dragstart', (e) => e.preventDefault());
+            if (this.widgetEl) {
+                this.widgetEl.addEventListener('contextmenu', (e) => e.preventDefault());
+            }
         }
 
         // 点击/戳一戳互动：展示对方上一句消息或心动回应，保留 2 秒
@@ -823,153 +885,25 @@
                 document.body.appendChild(modal);
             }
             this.populateConfigData(modal);
-            modal.classList.add('active');
-            modal.style.display = 'flex';
+            if (!modal._eventsBound) {
+                this.bindModalEvents(modal);
+                modal._eventsBound = true;
+            }
+            if (typeof showModal === 'function') {
+                showModal(modal);
+            } else {
+                modal.classList.add('active');
+                modal.style.display = 'flex';
+            }
         }
 
         createConfigModalDOM() {
-            const modal = document.createElement('div');
+            let modal = document.getElementById('floating-pet-modal');
+            if (modal) return modal;
+            modal = document.createElement('div');
             modal.id = 'floating-pet-modal';
             modal.className = 'modal custom-pet-modal';
-            modal.style.cssText = `
-                display: none;
-                position: fixed;
-                inset: 0;
-                background: rgba(0, 0, 0, 0.65);
-                backdrop-filter: blur(8px);
-                -webkit-backdrop-filter: blur(8px);
-                z-index: 200000;
-                align-items: center;
-                justify-content: center;
-                padding: 16px;
-                box-sizing: border-box;
-            `;
-
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 480px; width: 100%; max-height: 90vh; overflow-y: auto; background: var(--secondary-bg, #fff); border-radius: 20px; padding: 22px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--text-primary); box-sizing: border-box;">
-                    <!-- 头部 -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 16px;">
-                        <div style="display:flex; align-items:center; gap: 10px;">
-                            <div style="width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg, var(--accent-color, #FF6B8B), #FF8E53); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 4px 12px rgba(255,107,139,0.35);">
-                                <i class="fas fa-paw"></i>
-                            </div>
-                            <div>
-                                <h3 style="margin:0; font-size:17px; font-weight:700;">桌面悬浮桌宠</h3>
-                                <p style="margin:2px 0 0; font-size:11.5px; color:var(--text-secondary);">对方发消息实时跳出·保留2秒·后台强力保活</p>
-                            </div>
-                        </div>
-                        <button id="pet-modal-close-x" style="background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer; padding:4px 8px;">&times;</button>
-                    </div>
-
-                    <!-- 总开关 -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:13px 16px; background:var(--primary-bg); border-radius:14px; border:1.5px solid var(--border-color); margin-bottom:16px;">
-                        <div>
-                            <div style="font-weight:700; font-size:14px;">开启桌面悬浮桌宠</div>
-                            <div style="font-size:11.5px; color:var(--text-secondary); margin-top:2px;">收到对方消息时立即跳出显示2秒，无冗余轮播</div>
-                        </div>
-                        <label class="switch" style="position:relative; display:inline-block; width:48px; height:26px;">
-                            <input id="pet-toggle-enable" type="checkbox">
-                            <span class="slider round" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#ccc; transition:.4s; border-radius:34px;"></span>
-                        </label>
-                    </div>
-
-                    <!-- 形象自定义区 (二选一：对方头像 / 自定义上传) -->
-                    <div style="margin-bottom:16px;">
-                        <label style="display:block; font-size:13px; font-weight:700; margin-bottom:10px;">
-                            <i class="fas fa-user-circle" style="color:var(--accent-color); margin-right:6px;"></i>桌宠形象选择
-                        </label>
-                        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-bottom:10px;">
-                            <button type="button" class="pet-avatar-type-btn" data-type="partner" style="padding:13px 10px; border-radius:12px; border:1.5px solid var(--border-color); background:var(--primary-bg); color:var(--text-primary); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;">
-                                <i class="fas fa-heart" style="color:#FF4081; display:block; font-size:20px; margin-bottom:6px;"></i>对方头像 (TA)
-                            </button>
-                            <button type="button" class="pet-avatar-type-btn" data-type="custom" style="padding:13px 10px; border-radius:12px; border:1.5px solid var(--border-color); background:var(--primary-bg); color:var(--text-primary); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s;">
-                                <i class="fas fa-cloud-upload-alt" style="color:#9C27B0; display:block; font-size:20px; margin-bottom:6px;"></i>自定义图片/GIF
-                            </button>
-                        </div>
-
-                        <!-- 自定义图片/动图上传面板 -->
-                        <div id="pet-custom-upload-box" style="display:none; padding:14px; background:var(--primary-bg); border-radius:14px; border:1.5px dashed var(--border-color); text-align:center; margin-bottom:10px;">
-                            <div id="pet-custom-preview-wrap" style="width:64px; height:64px; border-radius:50%; margin:0 auto 8px; overflow:hidden; border:2.5px solid var(--accent-color); display:none;">
-                                <img id="pet-custom-preview-img" style="width:100%; height:100%; object-fit:cover;">
-                            </div>
-                            <input id="pet-upload-file-input" type="file" accept="image/*" style="display:none;">
-                            <button type="button" id="pet-trigger-upload-btn" style="padding:8px 16px; border-radius:10px; background:var(--accent-color); color:#fff; border:none; font-size:12px; font-weight:600; cursor:pointer;">
-                                <i class="fas fa-image"></i> 从手机/电脑相册上传图片或 GIF
-                            </button>
-                            <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">支持任意正方形/异形图片、透明背景 PNG、动态 GIF</div>
-                        </div>
-                    </div>
-
-                    <!-- 消息冒泡机制说明 -->
-                    <div style="margin-bottom:16px; padding:13px 15px; background:var(--primary-bg); border-radius:14px; border:1px solid var(--border-color);">
-                        <div style="font-weight:700; font-size:13px; margin-bottom:6px;">
-                            <i class="fas fa-comment-dots" style="color:var(--accent-color); margin-right:6px;"></i>消息弹窗机制 (无多余轮播)
-                        </div>
-                        <div style="font-size:12px; color:var(--text-secondary); line-height:1.6;">
-                            • 配合聊天设置的<strong>「最短/最长等待时间」</strong>，对方回复时桌宠头顶会立即跳出气泡。<br>
-                            • 每条消息在桌宠头顶<strong>精准停留 2 秒钟</strong>后自动消失。<br>
-                            • 轻点/戳一戳桌宠也可以直接查看对方最新心动回应。
-                        </div>
-                    </div>
-
-                    <!-- 后台强化保活引擎 (WakeLock + Worker + 无声音频) -->
-                    <div style="margin-bottom:16px; padding:14px; background:linear-gradient(135deg, rgba(var(--accent-color-rgb, 255,107,139), 0.08), rgba(var(--accent-color-rgb, 255,107,139), 0.02)); border-radius:14px; border:1.5px solid rgba(var(--accent-color-rgb, 255,107,139), 0.25);">
-                        <div style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:13px; margin-bottom:10px;">
-                            <i class="fas fa-shield-alt" style="color:var(--accent-color);"></i>
-                            <span>后台强力保活增强</span>
-                            <span style="font-size:10px; padding:1px 6px; background:var(--accent-color); color:#fff; border-radius:6px;">切出网页不杀</span>
-                        </div>
-
-                        <!-- 独立 Web Worker 精确时钟 (防节流) -->
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font-size:12px;">
-                            <div>
-                                <div style="font-weight:600;">Web Worker 独立精准时钟</div>
-                                <div style="font-size:11px; color:var(--text-secondary);">人在后台时，最短/最长等待时间定时器不被浏览器降频</div>
-                            </div>
-                            <input id="pet-keepalive-worker" type="checkbox" checked style="accent-color:var(--accent-color); width:16px; height:16px;">
-                        </div>
-
-                        <!-- 屏幕常亮 WakeLock -->
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; font-size:12px;">
-                            <div>
-                                <div style="font-weight:600;">屏幕防休眠 (WakeLock)</div>
-                                <div style="font-size:11px; color:var(--text-secondary);">防止手机/平板屏幕自动黑屏休眠</div>
-                            </div>
-                            <input id="pet-keepalive-wakelock" type="checkbox" style="accent-color:var(--accent-color); width:16px; height:16px;">
-                        </div>
-
-                        <!-- 无声心跳音频保活通道 -->
-                        <div style="display:flex; align-items:center; justify-content:space-between; font-size:12px;">
-                            <div>
-                                <div style="font-weight:600;">极微无声心跳音频通道</div>
-                                <div style="font-size:11px; color:var(--text-secondary);">针对 iOS/安卓移动端切后台强力防杀</div>
-                            </div>
-                            <input id="pet-keepalive-audio" type="checkbox" style="accent-color:var(--accent-color); width:16px; height:16px;">
-                        </div>
-                    </div>
-
-                    <!-- 跨桌面画中画 (PiP) -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:var(--primary-bg); border-radius:14px; border:1px solid var(--border-color); margin-bottom:16px;">
-                        <div>
-                            <div style="font-weight:700; font-size:12.5px;">
-                                <i class="fas fa-window-restore" style="color:var(--accent-color); margin-right:5px;"></i>画中画跨桌面小窗
-                            </div>
-                            <div style="font-size:11px; color:var(--text-secondary); margin-top:2px;">跳出浏览器标签页，切换应用时桌宠依然悬浮</div>
-                        </div>
-                        <button id="pet-pip-trigger-btn" type="button" style="padding:6px 12px; border-radius:10px; background:var(--accent-color); color:#fff; border:none; font-size:11.5px; font-weight:600; cursor:pointer;">
-                            开启画中画
-                        </button>
-                    </div>
-
-                    <!-- 底部按钮 -->
-                    <div style="display:flex; gap:10px;">
-                        <button id="pet-modal-cancel" type="button" class="modal-btn modal-btn-secondary" style="flex:1; padding:11px; border-radius:12px; font-weight:600;">关闭</button>
-                        <button id="pet-modal-save" type="button" class="modal-btn modal-btn-primary" style="flex:1; padding:11px; border-radius:12px; background:var(--accent-color); color:#fff; border:none; font-weight:600;">保存并生效</button>
-                    </div>
-                </div>
-            `;
-
-            this.bindModalEvents(modal);
+            modal.style.zIndex = '2500';
             return modal;
         }
 
@@ -1010,7 +944,7 @@
                     btn.style.boxShadow = '0 0 0 1px var(--accent-color)';
                 } else {
                     btn.style.borderColor = 'var(--border-color)';
-                    btn.style.background = 'var(--primary-bg)';
+                    btn.style.background = 'var(--primary-bg, #f7f7f7)';
                     btn.style.boxShadow = 'none';
                 }
             });
@@ -1024,8 +958,12 @@
             let currentCustomUrl = this.config.customAvatarUrl || '';
 
             const closeModal = () => {
-                modal.classList.remove('active');
-                modal.style.display = 'none';
+                if (typeof hideModal === 'function') {
+                    hideModal(modal);
+                } else {
+                    modal.classList.remove('active');
+                    modal.style.display = 'none';
+                }
             };
 
             modal.querySelector('#pet-modal-close-x')?.addEventListener('click', closeModal);

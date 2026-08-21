@@ -360,37 +360,38 @@
             </div>
         </div>
         <div class="input-area">
-    <button id="collapse-expand-btn" title="展开更多" style="display:none;width:36px;height:36px;border:none;border-radius:50%;cursor:pointer;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);font-size:14px;transition:all 0.25s;flex-shrink:0;align-items:center;justify-content:center;" onclick="window.toggleCollapsedExtras && window.toggleCollapsedExtras()"><i class="fas fa-chevron-up"></i></button>
-    <button class="attachment-btn input-btn collapse-hideable" id="attachment-btn" title="发送图片"><i class="fas fa-image"></i></button>
-    
-    <button class="combo-btn input-btn collapse-hideable" id="combo-btn" title="表情 & 拍一拍">
-        <i class="fas fa-laugh-beam"></i>
-    </button>
+            <button id="collapse-expand-btn" title="展开更多" style="display:none;width:36px;height:36px;border:none;border-radius:50%;cursor:pointer;background:rgba(var(--accent-color-rgb),0.12);color:var(--accent-color);font-size:14px;transition:all 0.25s;flex-shrink:0;align-items:center;justify-content:center;" onclick="window.toggleCollapsedExtras && window.toggleCollapsedExtras()"><i class="fas fa-chevron-up"></i></button>
+            <button class="attachment-btn input-btn collapse-hideable" id="attachment-btn" title="发送图片"><i class="fas fa-image"></i></button>
+            
+            <button class="combo-btn input-btn collapse-hideable" id="combo-btn" title="表情 & 拍一拍">
+                <i class="fas fa-laugh-beam"></i>
+            </button>
 
-    <textarea class="message-input" id="message-input" placeholder="" rows="1"></textarea>
-    
-    <div class="input-buttons">
-    <button class="continue-btn input-btn" id="continue-btn" title="让对方继续说"><i class="fas fa-ellipsis-h"></i></button>
-        <button class="batch-btn input-btn collapse-hideable" id="batch-btn" title="批量发送模式"><i class="fas fa-layer-group"></i></button>
-        <button class="send-btn input-btn" id="send-btn" title="发送消息"><i class="fas fa-paper-plane"></i></button>
-        
-        <div class="sticker-picker-popover" id="user-sticker-picker">
-            <div class="combo-tabs-header">
-                <button class="combo-tab-btn active" data-tab="my-sticker"><i class="fas fa-user" style="font-size:10px;"></i> 我</button>
-                <button class="combo-tab-btn" data-tab="partner-sticker"><i class="fas fa-heart" style="font-size:10px;"></i> 对方</button>
-                <button class="combo-tab-btn" data-tab="poke">拍一拍</button>
-                <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
-                    <button id="sticker-add-btn" onclick="document.getElementById('my-sticker-quick-upload').click()" title="添加我的表情" style="background:var(--accent-color);border:none;cursor:pointer;padding:4px 10px;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px;border-radius:8px;transition:all 0.2s;box-shadow:0 2px 8px rgba(var(--accent-color-rgb),0.35);" onmouseover="this.style.opacity='0.85';this.style.transform='scale(1.05)'" onmouseout="this.style.opacity='1';this.style.transform='scale(1)'"><i class="fas fa-plus"></i> 添加</button>
-                    <button onclick="window.openMyStickerSettings()" title="管理表情库" style="background:none;border:none;cursor:pointer;padding:4px 8px;color:var(--text-secondary);font-size:12px;display:flex;align-items:center;gap:3px;border-radius:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-color-rgb),0.12)';this.style.color='var(--accent-color)'" onmouseout="this.style.background='none';this.style.color='var(--text-secondary)'"><i class="fas fa-cog"></i></button>
-                </div>
+            <textarea class="message-input" id="message-input" placeholder="" rows="1"></textarea>
+            
+            <div class="input-buttons">
+                <button class="continue-btn input-btn" id="continue-btn" title="让对方继续说"><i class="fas fa-ellipsis-h"></i></button>
+                <button class="batch-btn input-btn collapse-hideable" id="batch-btn" title="批量发送模式"><i class="fas fa-layer-group"></i></button>
+                <button class="send-btn input-btn" id="send-btn" title="发送消息"><i class="fas fa-paper-plane"></i></button>
             </div>
-            <div class="combo-content-area" id="combo-content-area">
-            </div>
+            <input type="file" id="image-input" class="file-input" accept="image/*" multiple>
+            <input type="file" id="my-sticker-quick-upload" class="file-input" accept="image/*" multiple>
         </div>
     </div>
-    <input type="file" id="image-input" class="file-input" accept="image/*" multiple>
-    <input type="file" id="my-sticker-quick-upload" class="file-input" accept="image/*" multiple>
-</div>
+
+    <!-- ══ 快捷表情 / 拍一拍全局弹出浮层（独立于输入栏，确保 iOS & 安卓完美居中不偏移） ══ -->
+    <div class="sticker-picker-popover" id="user-sticker-picker">
+        <div class="combo-tabs-header">
+            <button class="combo-tab-btn active" data-tab="my-sticker"><i class="fas fa-user" style="font-size:10px;"></i> 我</button>
+            <button class="combo-tab-btn" data-tab="partner-sticker"><i class="fas fa-heart" style="font-size:10px;"></i> 对方</button>
+            <button class="combo-tab-btn" data-tab="poke">拍一拍</button>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
+                <button id="sticker-add-btn" onclick="document.getElementById('my-sticker-quick-upload').click()" title="添加我的表情" style="background:var(--accent-color);border:none;cursor:pointer;padding:4px 10px;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px;border-radius:8px;transition:all 0.2s;box-shadow:0 2px 8px rgba(var(--accent-color-rgb),0.35);" onmouseover="this.style.opacity='0.85';this.style.transform='scale(1.05)'" onmouseout="this.style.opacity='1';this.style.transform='scale(1)'"><i class="fas fa-plus"></i> 添加</button>
+                <button onclick="window.openMyStickerSettings()" title="管理表情库" style="background:none;border:none;cursor:pointer;padding:4px 8px;color:var(--text-secondary);font-size:12px;display:flex;align-items:center;gap:3px;border-radius:6px;transition:all 0.2s;" onmouseover="this.style.background='rgba(var(--accent-color-rgb),0.12)';this.style.color='var(--accent-color)'" onmouseout="this.style.background='none';this.style.color='var(--text-secondary)'"><i class="fas fa-cog"></i></button>
+            </div>
+        </div>
+        <div class="combo-content-area" id="combo-content-area">
+        </div>
     </div>
 
 
@@ -2343,6 +2344,118 @@
 
         <div class="modal-buttons" style="margin-top:14px;">
             <button class="modal-btn modal-btn-secondary" id="close-todo-modal">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ 桌面悬浮桌宠 Modal ══ -->
+<div class="modal" id="floating-pet-modal">
+    <div class="modal-content" style="max-width: 460px; width: 92%; max-height: 88vh;">
+        <div class="modal-title">
+            <i class="fas fa-paw"></i><span>桌面悬浮桌宠</span>
+        </div>
+
+        <!-- 总开关 -->
+        <div class="setting-pill-row" style="margin-bottom: 14px; padding: 10px 14px; background: var(--primary-bg); border-radius: 12px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div style="font-weight: 600; font-size: 13.5px;">开启桌面悬浮桌宠</div>
+                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">收到对方消息时立即跳出显示2秒</div>
+            </div>
+            <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px; margin: 0;">
+                <input id="pet-toggle-enable" type="checkbox">
+                <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .3s; border-radius: 24px;"></span>
+            </label>
+        </div>
+
+        <!-- 形象自定义区 -->
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 12.5px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">
+                <i class="fas fa-user-circle" style="color: var(--accent-color); margin-right: 5px;"></i>桌宠形象选择
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <button type="button" class="pet-avatar-type-btn" data-type="partner" style="padding: 12px 8px; border-radius: 12px; border: 1.5px solid var(--border-color); background: var(--primary-bg); color: var(--text-primary); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <i class="fas fa-heart" style="color: #FF4081; font-size: 18px;"></i>
+                    <span>对方头像 (TA)</span>
+                </button>
+                <button type="button" class="pet-avatar-type-btn" data-type="custom" style="padding: 12px 8px; border-radius: 12px; border: 1.5px solid var(--border-color); background: var(--primary-bg); color: var(--text-primary); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <i class="fas fa-cloud-upload-alt" style="color: #9C27B0; font-size: 18px;"></i>
+                    <span>自定义图片/GIF</span>
+                </button>
+            </div>
+
+            <!-- 自定义图片上传 -->
+            <div id="pet-custom-upload-box" style="display: none; padding: 12px; background: var(--primary-bg); border-radius: 12px; border: 1.5px dashed var(--border-color); text-align: center; margin-bottom: 8px;">
+                <div id="pet-custom-preview-wrap" style="width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 8px; overflow: hidden; border: 2px solid var(--accent-color); display: none;">
+                    <img id="pet-custom-preview-img" style="width: 100%; height: 100%; object-fit: cover;">
+                </div>
+                <input id="pet-upload-file-input" type="file" accept="image/*" style="display: none;">
+                <button type="button" id="pet-trigger-upload-btn" class="modal-btn modal-btn-secondary" style="padding: 6px 14px; font-size: 12px;">
+                    <i class="fas fa-image"></i> 选择本地图片或 GIF
+                </button>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 5px;">支持透明背景 PNG、动态 GIF 等</div>
+            </div>
+        </div>
+
+        <!-- 消息机制说明 -->
+        <div style="margin-bottom: 14px; padding: 10px 12px; background: var(--primary-bg); border-radius: 12px; border: 1px solid var(--border-color); font-size: 11.5px; color: var(--text-secondary); line-height: 1.5;">
+            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                <i class="fas fa-info-circle" style="color: var(--accent-color); margin-right: 4px;"></i>运行机制
+            </div>
+            • 对方发来消息时在桌宠头顶立即冒泡，精准停留 <strong>2 秒</strong>后隐藏。<br>
+            • 点击或拖动桌宠可以戳一戳互动，查看最新心动回应。
+        </div>
+
+        <!-- 后台强力保活 -->
+        <div style="margin-bottom: 14px; padding: 12px; background: var(--primary-bg); border-radius: 12px; border: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <div style="font-weight: 600; font-size: 12.5px; color: var(--text-primary);">
+                    <i class="fas fa-shield-alt" style="color: var(--accent-color); margin-right: 4px;"></i>后台防杀保活
+                </div>
+                <span style="font-size: 10.5px; padding: 1px 6px; background: rgba(var(--accent-color-rgb, 255,107,139), 0.15); color: var(--accent-color); border-radius: 6px; font-weight: 600;">切出不降频</span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px;">
+                <div>
+                    <div>Web Worker 独立时钟</div>
+                    <div style="font-size: 10.5px; color: var(--text-secondary);">防止切后台时等待时间被系统降频</div>
+                </div>
+                <input id="pet-keepalive-worker" type="checkbox" checked style="accent-color: var(--accent-color); width: 16px; height: 16px;">
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px;">
+                <div>
+                    <div>屏幕防休眠 (WakeLock)</div>
+                    <div style="font-size: 10.5px; color: var(--text-secondary);">防止手机/平板屏幕自动熄灭</div>
+                </div>
+                <input id="pet-keepalive-wakelock" type="checkbox" style="accent-color: var(--accent-color); width: 16px; height: 16px;">
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+                <div>
+                    <div>微静音音频保活</div>
+                    <div style="font-size: 10.5px; color: var(--text-secondary);">移动端切后台强力防系统杀进程</div>
+                </div>
+                <input id="pet-keepalive-audio" type="checkbox" style="accent-color: var(--accent-color); width: 16px; height: 16px;">
+            </div>
+        </div>
+
+        <!-- 跨桌面画中画 -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--primary-bg); border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 16px;">
+            <div>
+                <div style="font-weight: 600; font-size: 12px;">
+                    <i class="fas fa-window-restore" style="color: var(--accent-color); margin-right: 4px;"></i>画中画悬浮窗
+                </div>
+                <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 1px;">跳出浏览器标签页全屏悬浮</div>
+            </div>
+            <button id="pet-pip-trigger-btn" type="button" class="modal-btn modal-btn-secondary" style="padding: 5px 10px; font-size: 11.5px;">
+                开启画中画
+            </button>
+        </div>
+
+        <!-- 底部操作按钮 -->
+        <div class="modal-buttons" style="margin-top: 0; padding-top: 12px; border-top: 1px solid var(--border-color);">
+            <button class="modal-btn modal-btn-secondary" id="pet-modal-cancel" type="button">关闭</button>
+            <button class="modal-btn modal-btn-primary" id="pet-modal-save" type="button">保存设置</button>
         </div>
     </div>
 </div>
