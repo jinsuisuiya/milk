@@ -2,8 +2,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loaderBar = document.getElementById('loader-tech-bar');
     const welcomeSubtitle = document.querySelector('.welcome-subtitle-scramble');
     const welcomeScreen = document.getElementById('welcome-animation');
-    const disclaimerModal = document.getElementById('disclaimer-modal');
-    const acceptDisclaimerBtn = document.getElementById('accept-disclaimer');
 
     const updateLoader = (text, width) => {
         if (welcomeSubtitle) welcomeSubtitle.textContent = text;

@@ -1544,21 +1544,6 @@ if (_cancelEnvEl) _cancelEnvEl.addEventListener('click', () => {
 
             const _clearStorageEl = document.getElementById('clear-storage');
             if (_clearStorageEl) _clearStorageEl.addEventListener('click', clearAllAppData);
-            const creditsBtn = document.getElementById('open-credits-btn');
-            if (creditsBtn) {
-                creditsBtn.addEventListener('click', () => {
-
-                    hideModal(DOMElements.dataModal.modal);
-
-
-                    const disclaimerModal = document.getElementById('disclaimer-modal');
-
-
-                    if (disclaimerModal) {
-                        showModal(disclaimerModal);
-                    }
-                });
-            }
 
         }
 

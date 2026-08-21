@@ -67,16 +67,6 @@
         +       '<div class="dm-row-info"><div class="dm-row-title">后台消息推送</div><div class="dm-row-desc" id="notif-status-text">收到新消息时弹出提醒</div></div>'
         +       '<label class="dm-toggle-pill"><input type="checkbox" id="notif-permission-toggle" onchange="handleNotifToggle(this)"><span class="dm-toggle-slider"></span></label>'
         +     '</div>'
-        +     '<div class="dm-row-item" id="replay-tutorial-btn-row" style="cursor:pointer">'
-        +       '<div class="dm-row-icon slate"><i class="fas fa-compass"></i></div>'
-        +       '<div class="dm-row-info"><div class="dm-row-title">重放新手引导</div><div class="dm-row-desc">重新播放功能介绍教程</div></div>'
-        +       '<button class="dm-nav-btn" id="replay-tutorial-btn"><i class="fas fa-play"></i></button>'
-        +     '</div>'
-        +     '<div class="dm-row-item" id="open-credits-row" style="cursor:pointer">'
-        +       '<div class="dm-row-icon violet"><i class="fas fa-scroll"></i></div>'
-        +       '<div class="dm-row-info"><div class="dm-row-title">声明与致谢</div><div class="dm-row-desc">开源声明、致谢名单</div></div>'
-        +       '<button class="dm-nav-btn" id="open-credits-btn"><i class="fas fa-chevron-right"></i></button>'
-        +     '</div>'
         +   '</div>'
 
         +   '<div class="dm-section-label danger-label"><i class="fas fa-triangle-exclamation"></i> 危险操作</div>'
@@ -414,25 +404,6 @@
                 if (f && typeof importChatHistory === 'function') importChatHistory(f);
             };
             inp.click();
-        });
-
-        var creditsBtn = mc.querySelector('#open-credits-btn');
-        if (creditsBtn) creditsBtn.addEventListener('click', function () {
-            var dataModal = document.getElementById('data-modal');
-            if (dataModal && typeof hideModal === 'function') hideModal(dataModal);
-            var disc = document.getElementById('disclaimer-modal');
-            if (disc && typeof showModal === 'function') showModal(disc);
-        });
-
-        var tutorialBtn = mc.querySelector('#replay-tutorial-btn');
-        if (tutorialBtn) tutorialBtn.addEventListener('click', function () {
-            var dataModal = document.getElementById('data-modal');
-            if (dataModal && typeof hideModal === 'function') hideModal(dataModal);
-            if (typeof startTour === 'function') {
-                if (window.localforage && window.APP_PREFIX) {
-                    localforage.removeItem(APP_PREFIX + 'tour_seen').then(startTour).catch(startTour);
-                } else { startTour(); }
-            }
         });
     }
 

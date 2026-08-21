@@ -179,27 +179,6 @@
                 scroll-behavior: auto !important;
             }
         }
-
-        #splash-declaration {
-            position: fixed;
-            inset: 0;
-            z-index: 999999;
-            background: #06060e;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            font-family: 'Noto Serif SC', serif;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: max(16px, env(safe-area-inset-top, 16px)) 12px max(16px, env(safe-area-inset-bottom, 16px));
-            box-sizing: border-box;
-            transition: opacity 0.9s ease;
-        }
-        #splash-declaration.splash-fade-out {
-            opacity: 0 !important;
-            pointer-events: none;
-        }
         .splash-bg-stars {
             position: absolute;
             inset: 0;
