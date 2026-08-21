@@ -1969,7 +1969,6 @@ function showModal(modalElement, focusElement = null) {
                 clearTimeout(modalElement._hideTimeout);
                 modalElement._hideTimeout = null;
             }
-            modalElement.classList.add('active');
             modalElement.style.display = 'flex';
             requestAnimationFrame(() => {
                 const content = modalElement.querySelector('.modal-content');
@@ -1991,7 +1990,6 @@ function showModal(modalElement, focusElement = null) {
             }
             if (modalElement._hideTimeout) clearTimeout(modalElement._hideTimeout);
             modalElement._hideTimeout = setTimeout(() => {
-                modalElement.classList.remove('active');
                 modalElement.style.display = 'none';
             }, 300);
         }

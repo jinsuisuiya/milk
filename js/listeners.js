@@ -542,6 +542,7 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
 
             const _githubBackupSettingsEl = document.getElementById('github-backup-settings');
             if (_githubBackupSettingsEl) _githubBackupSettingsEl.addEventListener('click', () => {
+                hideModal(DOMElements.settingsModal.modal);
                 if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
                     window.GitHubBackup.openModal();
                 }
@@ -549,6 +550,7 @@ if (_chatSettingsEl) _chatSettingsEl.addEventListener('click', () => {
 
             const _githubBackupAdvancedEl = document.getElementById('github-backup-advanced-function');
             if (_githubBackupAdvancedEl) _githubBackupAdvancedEl.addEventListener('click', () => {
+                hideModal(DOMElements.advancedModal.modal);
                 if (window.GitHubBackup && typeof window.GitHubBackup.openModal === 'function') {
                     window.GitHubBackup.openModal();
                 }

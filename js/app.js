@@ -268,28 +268,3 @@ window.addEventListener('load', function() {
         } catch(e) { console.warn('Daily greeting timing error:', e); }
     }, 4500);
 }, { once: true });
-
-/* G老师布局修复：动态测量底部输入栏高度，避免消息被固定输入栏遮挡 */
-(function setupResponsiveInputHeight() {
-    const update = () => {
-        const bar = document.querySelector('.input-area-wrapper');
-        if (!bar) return;
-        const h = Math.ceil(bar.getBoundingClientRect().height);
-        document.documentElement.style.setProperty('--input-safe-height', `${h + 8}px`);
-    };
-    const init = () => {
-        update();
-        const bar = document.querySelector('.input-area-wrapper');
-        if (bar && 'ResizeObserver' in window) {
-            const ro = new ResizeObserver(update);
-            ro.observe(bar);
-        }
-        window.addEventListener('resize', update, { passive: true });
-        window.addEventListener('orientationchange', () => setTimeout(update, 100), { passive: true });
-    };
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else {
-        init();
-    }
-})();
