@@ -9961,7 +9961,7 @@
 
         
         #data-modal {
-            align-items: flex-end !important;
+            align-items: stretch !important;
             padding: 0 !important;
         }
 
@@ -9970,14 +9970,17 @@
             overflow: hidden !important;
             display: flex !important;
             flex-direction: column !important;
-            height: 93dvh !important;
-            max-height: 93dvh !important;
-            min-height: 200px !important;
-            border-radius: 28px 28px 0 0 !important;
+            height: 100% !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            min-height: 100dvh !important;
+            border-radius: 0 !important;
             width: 100% !important;
-            max-width: 520px !important;
-            margin: 0 auto !important;
-            box-shadow: 0 -8px 40px rgba(0,0,0,0.18) !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+            margin: 0 !important;
+            box-shadow: none !important;
             background: var(--primary-bg) !important;
             will-change: transform, opacity;
             animation: dmSheetIn 0.38s cubic-bezier(0.32,0.72,0,1) both !important;
@@ -10483,7 +10486,7 @@
         .dm-action-card { display: none !important; }
 
         @media (max-width: 480px) {
-            #data-modal .modal-content { max-height: 96dvh; border-radius: 24px 24px 0 0; }
+            #data-modal .modal-content { max-height: 100dvh !important; border-radius: 0 !important; }
 
             .dm-stats-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -11503,11 +11506,11 @@
     }
 
     /* 模态框全局适配小屏 */
-    .modal {
+    .modal:not(.fullscreen-modal) {
         padding: max(8px, env(safe-area-inset-top, 8px)) 8px max(8px, env(safe-area-inset-bottom, 8px));
         box-sizing: border-box;
     }
-    .modal-content {
+    .modal-content:not(.fullscreen-modal .modal-content) {
         width: 100% !important;
         max-width: min(440px, calc(100vw - 16px)) !important;
         max-height: min(90vh, 90dvh) !important;
@@ -11618,7 +11621,7 @@
     .settings-card span {
         font-size: 10.5px;
     }
-    .modal-content {
+    .modal-content:not(.fullscreen-modal .modal-content) {
         padding: 14px 10px 10px !important;
     }
 }
@@ -11723,8 +11726,8 @@ button, input, textarea {
     bottom: calc(65px + env(safe-area-inset-bottom)) !important;
 }
 
-.modal,
-.modal-content,
+.modal:not(.fullscreen-modal),
+.modal-content:not(.fullscreen-modal .modal-content),
 .pet-modal {
     max-width: calc(100vw - 24px);
     max-height: calc(100dvh - 48px);
@@ -11744,3 +11747,370 @@ button, input, textarea {
         font-size: 14px;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   全屏设置界面 / 全屏模态框 (Full-Screen Modal System - Edge-to-Edge)
+   ══════════════════════════════════════════════════════════════ */
+.modal.fullscreen-modal,
+div[id].modal.fullscreen-modal,
+body .modal.fullscreen-modal,
+#settings-modal,
+#appearance-modal,
+#chat-modal,
+#advanced-modal,
+#data-modal,
+#stats-modal,
+#session-modal,
+#fortune-lenormand-modal,
+#mood-modal,
+#theme-editor-modal,
+#custom-replies-modal,
+#anniversary-modal,
+#decision-menu-modal,
+#wheel-modal,
+#todo-modal,
+#floating-pet-modal,
+#github-backup-modal,
+#group-chat-modal,
+#envelope-modal,
+#envelope-view-modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    width: 100vw !important;
+    height: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    min-width: 100vw !important;
+    min-height: 100dvh !important;
+    background: var(--primary-bg) !important;
+    background-color: var(--primary-bg) !important;
+    z-index: 20000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    overflow: hidden !important;
+}
+
+@keyframes fullscreenModalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98) translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal.fullscreen-modal .modal-content,
+div[id].modal.fullscreen-modal .modal-content,
+body .modal.fullscreen-modal .modal-content,
+div[id].modal.fullscreen-modal > .modal-content,
+#settings-modal .modal-content,
+#appearance-modal .modal-content,
+#chat-modal .modal-content,
+#advanced-modal .modal-content,
+#data-modal .modal-content,
+#stats-modal .modal-content,
+#session-modal .modal-content,
+#fortune-lenormand-modal .modal-content,
+#mood-modal .modal-content,
+#theme-editor-modal .modal-content,
+#custom-replies-modal .modal-content,
+#anniversary-modal .modal-content,
+#decision-menu-modal .modal-content,
+#wheel-modal .modal-content,
+#todo-modal .modal-content,
+#floating-pet-modal .modal-content,
+#github-backup-modal .modal-content,
+#group-chat-modal .modal-content,
+#envelope-modal .modal-content,
+#envelope-view-modal .modal-content {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 100vw !important;
+    height: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: var(--primary-bg) !important;
+    background-color: var(--primary-bg) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    inset: 0 !important;
+    transform: none !important;
+    animation: none !important;
+}
+
+/* Modal Title Header in Fullscreen Settings */
+.modal.fullscreen-modal .modal-title,
+.modal.fullscreen-modal .cs-header,
+div[id].modal.fullscreen-modal .modal-title {
+    background: var(--primary-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: max(14px, env(safe-area-inset-top, 14px)) 20px 14px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03) !important;
+    border-radius: 0 !important;
+}
+
+.modal.fullscreen-modal .modal-title span {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+}
+
+/* Header Close & Back buttons */
+.modal-header-action-btn {
+    background: rgba(var(--accent-color-rgb, 255,107,139), 0.12) !important;
+    color: var(--accent-color) !important;
+    border: 1px solid rgba(var(--accent-color-rgb, 255,107,139), 0.25) !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+}
+
+.modal-header-action-btn:hover {
+    background: var(--accent-color) !important;
+    color: #ffffff !important;
+    transform: scale(1.08) !important;
+}
+
+.modal-header-action-btn:active {
+    transform: scale(0.94) !important;
+}
+
+/* Scrollable Body inside Fullscreen Settings */
+.modal.fullscreen-modal .settings-body,
+.modal.fullscreen-modal .cs-panels,
+.modal.fullscreen-modal .modal-main-view {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: max(20px, env(safe-area-inset-bottom, 20px)) !important;
+}
+
+/* Settings Grid in Fullscreen Mode */
+.modal.fullscreen-modal .settings-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+    padding: 24px 20px !important;
+    max-width: 900px !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+}
+
+@media (min-width: 600px) {
+    .modal.fullscreen-modal .settings-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 20px !important;
+        padding: 32px 24px !important;
+    }
+}
+
+.modal.fullscreen-modal .settings-card {
+    background: var(--primary-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 16px !important;
+    padding: 28px 18px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    cursor: pointer !important;
+    transition: all 0.22s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02) !important;
+}
+
+.modal.fullscreen-modal .settings-card i {
+    font-size: 26px !important;
+    color: var(--accent-color) !important;
+    transition: transform 0.22s ease !important;
+}
+
+.modal.fullscreen-modal .settings-card span {
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+}
+
+.modal.fullscreen-modal .settings-card:hover {
+    border-color: var(--accent-color) !important;
+    transform: translateY(-4px) !important;
+    box-shadow: 0 10px 28px rgba(var(--accent-color-rgb, 255,107,139), 0.18) !important;
+}
+
+.modal.fullscreen-modal .settings-card:hover i {
+    transform: scale(1.15) !important;
+}
+
+.modal.fullscreen-modal .settings-card:active {
+    transform: translateY(0) scale(0.96) !important;
+}
+
+/* Sticky Footer inside Fullscreen Settings */
+.modal.fullscreen-modal .modal-buttons,
+.modal.fullscreen-modal .cs-footer,
+div[id].modal.fullscreen-modal .modal-buttons {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: var(--secondary-bg) !important;
+    border-top: 1px solid var(--border-color) !important;
+    padding: 14px 20px max(16px, env(safe-area-inset-bottom, 16px)) !important;
+    margin: 0 !important;
+    z-index: 20 !important;
+    border-radius: 0 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   根治黑边：强制全屏无缝平铺 (Ultimate Edge-to-Edge Fullscreen Guarantee)
+   ══════════════════════════════════════════════════════════════ */
+html, body {
+    background-color: var(--primary-bg) !important;
+}
+
+#settings-modal,
+#appearance-modal,
+#chat-modal,
+#advanced-modal,
+#data-modal,
+#stats-modal,
+#session-modal,
+#fortune-lenormand-modal,
+#mood-modal,
+#theme-editor-modal,
+#custom-replies-modal,
+#anniversary-modal,
+#decision-menu-modal,
+#wheel-modal,
+#todo-modal,
+#floating-pet-modal,
+#github-backup-modal,
+#group-chat-modal,
+#envelope-modal,
+#envelope-view-modal,
+#ti-settings-modal,
+#daily-greeting-modal,
+.modal.fullscreen-modal,
+div[id].modal.fullscreen-modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    inset: 0 !important;
+    width: 100% !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 100vw !important;
+    height: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: var(--primary-bg) !important;
+    background-color: var(--primary-bg) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    z-index: 200000 !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+}
+
+#settings-modal .modal-content,
+#appearance-modal .modal-content,
+#chat-modal .modal-content,
+#advanced-modal .modal-content,
+#data-modal .modal-content,
+#stats-modal .modal-content,
+#session-modal .modal-content,
+#fortune-lenormand-modal .modal-content,
+#mood-modal .modal-content,
+#theme-editor-modal .modal-content,
+#custom-replies-modal .modal-content,
+#anniversary-modal .modal-content,
+#decision-menu-modal .modal-content,
+#wheel-modal .modal-content,
+#todo-modal .modal-content,
+#floating-pet-modal .modal-content,
+#github-backup-modal .modal-content,
+#github-backup-modal .github-backup-dialog,
+#group-chat-modal .modal-content,
+#envelope-modal .modal-content,
+#envelope-view-modal .modal-content,
+#ti-settings-modal .modal-content,
+.fl-modal-content,
+.modal.fullscreen-modal .modal-content,
+div[id].modal.fullscreen-modal .modal-content {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    inset: 0 !important;
+    width: 100% !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 100vw !important;
+    height: 100% !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: var(--primary-bg) !important;
+    background-color: var(--primary-bg) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    transform: none !important;
+}
+
+
