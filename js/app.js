@@ -176,7 +176,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(hideWelcomeScreen, 3500);
     }
 });
-const stickerInput = document.getElementById('sticker-file-input');
+
+// DOMContentLoaded 外に配置されていたイベントリスナーを安全なタイミングに移動
+document.addEventListener('DOMContentLoaded', () => {
+    const stickerInput = document.getElementById('sticker-file-input');
             if (stickerInput) {
                 stickerInput.addEventListener('change', async (e) => {
                     const files = Array.from(e.target.files);
@@ -218,8 +221,8 @@ const stickerInput = document.getElementById('sticker-file-input');
                     e.target.value = '';
                 });
             }
-const myStickerQuickUpload = document.getElementById('my-sticker-quick-upload');
-if (myStickerQuickUpload) {
+    const myStickerQuickUpload = document.getElementById('my-sticker-quick-upload');
+    if (myStickerQuickUpload) {
     myStickerQuickUpload.addEventListener('change', async (e) => {
         const files = Array.from(e.target.files);
         if (!files.length) return;
@@ -242,6 +245,7 @@ if (myStickerQuickUpload) {
         e.target.value = '';
     });
 }
+}); // DOMContentLoaded 終わり
 
 window.addEventListener('load', function() {
     setTimeout(function() {
@@ -251,21 +255,18 @@ window.addEventListener('load', function() {
             if (typeof _buildDailyGreeting === 'function') _buildDailyGreeting();
             if (window.localforage && window.APP_PREFIX) {
                 localforage.getItem(window.APP_PREFIX + 'tour_seen').then(function(seen) {
+                    // オンボーディングツアーを見た場合のみ挨拶モーダルを表示する
                     if (seen) {
                         var modal = document.getElementById('daily-greeting-modal');
                         if (modal) modal.classList.remove('hidden');
                         localStorage.setItem('dailyGreetingShown', new Date().toDateString());
                     }
-                }).catch(function() {
-                    var modal = document.getElementById('daily-greeting-modal');
-                    if (modal) modal.classList.remove('hidden');
-                    localStorage.setItem('dailyGreetingShown', new Date().toDateString());
+                }).catch(function(err) {
+                    // localforage エラー時はモーダルを表示しない（誤表示防止）
+                    console.warn('Daily greeting: localforage read failed, skipping modal.', err);
                 });
-            } else {
-                var modal = document.getElementById('daily-greeting-modal');
-                if (modal) modal.classList.remove('hidden');
-                localStorage.setItem('dailyGreetingShown', new Date().toDateString());
             }
+            // localforage が未初期化の場合はモーダルを表示しない
         } catch(e) { console.warn('Daily greeting timing error:', e); }
     }, 4500);
 }, { once: true });

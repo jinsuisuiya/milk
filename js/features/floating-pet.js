@@ -680,8 +680,17 @@
             this.avatarEl.addEventListener('touchstart', onTouchStart, { passive: false });
             this.avatarEl.addEventListener('contextmenu', (e) => e.preventDefault());
             this.avatarEl.addEventListener('dragstart', (e) => e.preventDefault());
+            // クリックイベントが DOM を上に伝播してオーバーレイを誤起動しないよう阻止する
+            // タッチ後のブラウザ合成 click も同様に止める
+            this.avatarEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+            });
             if (this.widgetEl) {
                 this.widgetEl.addEventListener('contextmenu', (e) => e.preventDefault());
+                this.widgetEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
             }
         }
 
